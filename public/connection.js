@@ -70,6 +70,8 @@ const Peer = window.Peer;
     const mediaConnection = peer.call(remoteId.value, localStream, callOptions);
     mediaConnections[mediaConnection.id] = mediaConnection;
     newPanel().addEvents(mediaConnection);
+
+    remoteId.value = "";
   });
 
 
@@ -81,7 +83,7 @@ const Peer = window.Peer;
     const remoteVideo = callPanel.getElementsByClassName('js-remote-stream')[0];
 
     function addEvents(mediaConnection) {
-      callPanel.getElementsByClassName('heading')[0].innerText = mediaConnection.id;
+      callPanel.getElementsByClassName('mid')[0].innerText = mediaConnection.id;
 
       mediaConnection.on('stream', async stream => {
         // Render remote stream for caller

@@ -2,6 +2,30 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <style>
+        .call-panels {
+            overflow: hidden;
+        }
+
+        .call-panel {
+            width: 320px;
+            margin: 10px;
+            padding: 5px;
+            float: left;
+            border: solid 1px #e4e4e4;
+        }
+
+        .heading {
+            margin: 0;
+            padding: 2px 10px;
+            background-color: #e4e4e4;
+        }
+
+        .remote-stream {
+            padding: 10px 2px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -22,11 +46,11 @@
     <script type="text/javascript" src="https://cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
     <script type="text/template" id="callPanelTemplate">
         <div class="call-panel">
-            <h2 class="heading"></h1>
+            <h2 class="heading">
+                <span class="mid"></span>
+                <button class="js-close-trigger">Close</button>
+            </h1>
             <div class="p2p-media">
-                <div class="local-stream">
-                    <button class="js-close-trigger">Close</button>
-                </div>
                 <div class="remote-stream">
                     <video class="js-remote-stream"></video>
                 </div>
