@@ -1,49 +1,38 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <style>
-        .call-panels {
-            overflow: hidden;
-        }
-
-        .call-panel {
-            width: 320px;
-            margin: 10px;
-            padding: 5px;
-            float: left;
-            border: solid 1px #e4e4e4;
-        }
-
-        .heading {
-            margin: 0;
-            padding: 2px 10px;
-            background-color: #e4e4e4;
-        }
-
-        .remote-stream {
-            padding: 10px 2px;
-            text-align: center;
-        }
-    </style>
-</head>
-<body>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SkyWay - Room example</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
     <div class="container">
-        <!-- <video id="js-local-stream"></video> -->
-
-        <p id="js-meta" style="display:none"></p>
-        <p>Your ID: <span id="js-local-id"></span></p>
+      <h1 class="heading">voffice</h1>
+      <p class="note" style="display:none">
+        Change Room mode (before join in a room):
+        <a href="#">mesh</a> / <a href="#sfu">sfu</a>
+      </p>
+      <div class="room">
         <div>
-            <input type="text" placeholder="Remote Peer ID" id="js-remote-id">
-            <button id="js-call-trigger">Call</button>
+          <video id="js-local-stream"></video>
+          <span id="js-room-mode"></span>:
+          <input type="text" placeholder="Room Name" id="js-room-id">
+          <button id="js-join-trigger">Join</button>
+          <button id="js-leave-trigger">Leave</button>
         </div>
 
-        <div class="call-panels"></div>
+        <div class="remote-streams" id="js-remote-streams"></div>
+
+        <div>
+          <pre class="messages" id="js-messages"></pre>
+          <input type="text" id="js-local-text">
+          <button id="js-send-trigger">Send</button>
+        </div>
+      </div>
+      <p class="meta" id="js-meta"></p>
     </div>
 
-    <!-- <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script> -->
-
-    <script type="text/javascript" src="https://cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
     <script type="text/template" id="callPanelTemplate">
         <div class="call-panel">
             <h3 class="heading">
@@ -58,10 +47,11 @@
         </div>
     </script>
 
+    <script src="//cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
     <script>
         const key = "05c8897d-1abc-4cf7-a4b7-528cbb522892";
         window.__SKYWAY_KEY__ = key;
     </script>
     <script src="./connection.js"></script>
-</body>
+  </body>
 </html>
