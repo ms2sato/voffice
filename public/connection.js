@@ -1,3 +1,6 @@
+const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+const SpeechGrammarList = window.webkitSpeechGrammarList || window.SpeechGrammarList;
+
 const Peer = window.Peer;
 
 (async function main() {
@@ -62,6 +65,57 @@ const Peer = window.Peer;
     debug: 3,
   }));
 
+
+  const speech = new SpeechRecognition() ;
+  speech.lang = 'ja-JP';
+  var rule = 'ちょっといい | ねえ | もしもし | はなせる | キター | やったー';
+
+  var grammar = `#JSGF V1.0 JIS ja; grammar options; public <options> = ${rule} ;`
+  // const speechRecognitionList = new SpeechGrammarList()
+  const speechRecognitionList = speech.grammars;
+  speechRecognitionList.addFromString(grammar, 1)
+  speech.grammars = speechRecognitionList
+
+
+  speech.addEventListener('result', function(e) {
+    console.log('on result')
+    speech.stop();
+    if(e.results[0].isFinal){
+        var autotext =  e.results[0][0].transcript
+
+        const line = autotext + '\n'
+        messages.textContent += line;
+        room.send(line);
+
+        if (autotext == "さよなら" || autotext == "バイバイ") {
+          // 側によるを作ったら、「xxxちょっといい？」でxxxさんに寄る
+          const closeMessage = '[コマンド一致！]退室します\n';
+          messages.textContent += closeMessage;
+          room.send(closeMessage);
+          room.close();
+        }
+     }
+  });
+
+  speech.addEventListener('end', () => {
+    console.log('on end')
+    speech.start()
+  });
+
+  speech.onstart = () => { console.log('on start') }
+  // speech.onend = () => { console.log('on end') }
+
+  speech.onspeechstart = () => { console.log('on speech start') }
+  speech.onspeechend = () => { console.log('on speech end') }
+
+  speech.onosundstart = () => { console.log('on sound start') }
+  speech.onsoundend = () => { console.log('on sound end') }
+
+  speech.onaudiostart = () => { console.log('on audio start') }
+  speech.onaudioend = () => { console.log('on audio end') }
+
+  var room = null;
+
   // Register join handler
   joinTrigger.addEventListener('click', () => {
     // Note that you need to ensure the peer has connected to signaling server
@@ -75,7 +129,7 @@ const Peer = window.Peer;
       stream: localStream
     },callOptions);
 
-    const room = peer.joinRoom(roomId.value, roomOptions);
+    room = peer.joinRoom(roomId.value, roomOptions);
 
     room.once('open', () => {
       messages.textContent += '=== 入室しました ===\n';
@@ -134,37 +188,7 @@ const Peer = window.Peer;
       localText.value = '';
     }
 
-    const speech = new webkitSpeechRecognition();
-    speech.lang = 'ja-JP';
-    speech.continuous = false
-    speech.interimResults = false
-
-    speech.addEventListener('result', function(e) {
-      console.log('on result')
-      speech.stop();
-      if(e.results[0].isFinal){
-          var autotext =  e.results[0][0].transcript
-          messages.textContent += autotext + '\n';
-       }
-    });
-
-    speech.addEventListener('end', () => {
-      console.log('on end')
-      speech.start()
-    });
     speech.start();
-
-    speech.onstart = () => { console.log('on start') }
-    // speech.onend = () => { console.log('on end') }
-
-    speech.onspeechstart = () => { console.log('on speech start') }
-    speech.onspeechend = () => { console.log('on speech end') }
-
-    speech.onosundstart = () => { console.log('on sound start') }
-    speech.onsoundend = () => { console.log('on sound end') }
-
-    speech.onaudiostart = () => { console.log('on audio start') }
-    speech.onaudioend = () => { console.log('on audio end') }
   });
 
   peer.on('error', console.error);
