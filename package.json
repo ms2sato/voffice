@@ -1,0 +1,19 @@
+{
+  "name": "socket-hub",
+  "version": "0.0.1",
+  "description": "websocket-hub",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "4.12.x",
+    "cfenv": "1.0.x",
+    "socket.io": "1.0.*",
+    "bluebird": "^2.2.2",
+    "underscore": "^1.6.0"
+  },
+  "repository": {},
+  "engines": {
+    "node": "5.9.x"
+  }
+}

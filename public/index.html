@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+</head>
+<body>
+    <div class="container">
+        <h2>local</h2>
+        <!-- <video id="js-local-stream"></video> -->
+
+        <div class="call">
+            <h1 class="heading">P2P Media example</h1>
+            <p class="note">
+                Enter remote peer ID to call.
+            </p>
+            <p class="js-meta"></p>
+            <div class="p2p-media">
+                <div class="local-stream">
+                    <p>Your ID: <span class="js-local-id"></span></p>
+                    <input type="text" placeholder="Remote Peer ID" class="js-remote-id">
+                    <button class="js-call-trigger">Call</button>
+                    <button class="js-close-trigger">Close</button>
+                </div>
+                <div class="remote-stream">
+                    <video class="js-remote-stream"></video>
+                </div>
+            </div>
+        </div>
+
+        <div class="call">
+            <h1 class="heading">P2P Media example</h1>
+            <p class="note">
+                Enter remote peer ID to call.
+            </p>
+            <p class="js-meta"></p>
+            <div class="p2p-media">
+                <div class="local-stream">
+                    <p>Your ID: <span class="js-local-id"></span></p>
+                    <input type="text" placeholder="Remote Peer ID" class="js-remote-id">
+                    <button class="js-call-trigger">Call</button>
+                    <button class="js-close-trigger">Close</button>
+                </div>
+                <div class="remote-stream">
+                    <video class="js-remote-stream"></video>
+                </div>
+            </div>
+        </div>
+
+        <div class="call">
+            <h1 class="heading">P2P Media example</h1>
+            <p class="note">
+                Enter remote peer ID to call.
+            </p>
+            <p class="js-meta"></p>
+            <div class="p2p-media">
+                <div class="local-stream">
+                    <p>Your ID: <span class="js-local-id"></span></p>
+                    <input type="text" placeholder="Remote Peer ID" class="js-remote-id">
+                    <button class="js-call-trigger">Call</button>
+                    <button class="js-close-trigger">Close</button>
+                </div>
+                <div class="remote-stream">
+                    <video class="js-remote-stream"></video>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+
+    <script type="text/javascript" src="https://cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
+    <script>
+        const key = "05c8897d-1abc-4cf7-a4b7-528cbb522892";
+        window.__SKYWAY_KEY__ = key;
+    </script>
+    <script src="./connection.js"></script>
+</body>
+</html>
