@@ -1,7 +1,7 @@
 const Peer = window.Peer;
 
 (async function main() {
-  const callPanelTemplate = $('#callPanelTemplate').text();
+  const callPanelTemplate = document.getElementById('callPanelTemplate').innerText;
 
   const localVideo = document.getElementById('js-local-stream');
   // Render local stream
@@ -76,14 +76,15 @@ const Peer = window.Peer;
 
 
   function newPanel() {
-    const $callPanel = $(callPanelTemplate).appendTo('.call-panels');
-    const callPanel = $callPanel[0];
+    const callPanels = document.getElementsByClassName('call-panels')[0];
+    callPanels.insertAdjacentHTML('beforeend', callPanelTemplate);
+    const callPanel =  callPanels.querySelector('.call-panel:last-child');
 
     const closeTrigger = callPanel.getElementsByClassName('js-close-trigger')[0];
     const remoteVideo = callPanel.getElementsByClassName('js-remote-stream')[0];
 
     function addEvents(mediaConnection) {
-      callPanel.getElementsByClassName('mid')[0].innerText = mediaConnection.id;
+      callPanel.getElementsByClassName('mid')[0].innerText = mediaConnection.remoteId;
 
       mediaConnection.on('stream', async stream => {
         // Render remote stream for caller
@@ -105,7 +106,7 @@ const Peer = window.Peer;
 
       function dispose() {
         delete mediaConnections[mediaConnection.id]
-        $callPanel.remove();
+        callPanel.parentNode.removeChild(callPanel);
       }
     }
 
