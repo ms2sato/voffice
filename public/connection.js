@@ -1,14 +1,28 @@
 const Peer = window.Peer;
 
 (async function main() {
+  const callPanelTemplate = $('#callPanelTemplate').text();
 
-  const callRoots = document.getElementsByClassName('call');
+  const localVideo = document.getElementById('js-local-stream');
+  // Render local stream
+  // localVideo.muted = true;
+  // localVideo.srcObject = localStream;
+  // localVideo.playsInline = true;
+  // await localVideo.play().catch(console.error);
+  const meta = document.getElementById('js-meta');
+  const sdkSrc = document.querySelector('script[src*=skyway]');
+  meta.innerText = `
+    UA: ${navigator.userAgent}
+    SDK: ${sdkSrc ? sdkSrc.src : 'unknown'}
+  `.trim();
+
+  const localId = document.getElementById('js-local-id');
 
   const constraints = {
     audio: true,
     video: {
-      width: 300,
-      height: 200,
+      width: 280,
+      height: 220,
       facingMode: "user"
     }
   };
@@ -23,42 +37,51 @@ const Peer = window.Peer;
   }));
 
   peer.on('error', console.error);
+  peer.once('open', id => (localId.textContent = id));
 
-  const localVideo = document.getElementById('js-local-stream');
-  // Render local stream
-  // localVideo.muted = true;
-  // localVideo.srcObject = localStream;
-  // localVideo.playsInline = true;
-  // await localVideo.play().catch(console.error);
+  // Register callee handler
+  peer.on('call', mediaConnection => {
+    mediaConnection.answer(localStream, callOptions);
+    if (mediaConnections[mediaConnection.id]) {
+      // already connected
+      return;
+    }
+
+    mediaConnections[mediaConnection.id] = mediaConnection;
+
+    newPanel().addEvents(mediaConnection);
+  });
 
   const callOptions = {
-    // audioBandwidth: 1,
     videoBandwidth: 1
   };
 
-  Array.from(callRoots).forEach(callRoot => {
-    const localId = callRoot.getElementsByClassName('js-local-id')[0];
-    const callTrigger = callRoot.getElementsByClassName('js-call-trigger')[0];
-    const closeTrigger = callRoot.getElementsByClassName('js-close-trigger')[0];
-    const remoteVideo = callRoot.getElementsByClassName('js-remote-stream')[0];
-    const remoteId = callRoot.getElementsByClassName('js-remote-id')[0];
-    const meta = callRoot.getElementsByClassName('js-meta')[0];
-    const sdkSrc = callRoot.querySelector('script[src*=skyway]');
+  const mediaConnections = {}
 
-    meta.innerText = `
-      UA: ${navigator.userAgent}
-      SDK: ${sdkSrc ? sdkSrc.src : 'unknown'}
-    `.trim();
+  const callTrigger = document.getElementById('js-call-trigger');
+  callTrigger.addEventListener('click', () => {
+    // Note that you need to ensure the peer has connected to signaling server
+    // before using methods of peer instance.
+    if (!peer.open) {
+      return;
+    }
 
-    // Register caller handler
-    callTrigger.addEventListener('click', () => {
-      // Note that you need to ensure the peer has connected to signaling server
-      // before using methods of peer instance.
-      if (!peer.open) {
-        return;
-      }
+    const remoteId = document.getElementById('js-remote-id');
+    const mediaConnection = peer.call(remoteId.value, localStream, callOptions);
+    mediaConnections[mediaConnection.id] = mediaConnection;
+    newPanel().addEvents(mediaConnection);
+  });
 
-      const mediaConnection = peer.call(remoteId.value, localStream, callOptions);
+
+  function newPanel() {
+    const $callPanel = $(callPanelTemplate).appendTo('.call-panels');
+    const callPanel = $callPanel[0];
+
+    const closeTrigger = callPanel.getElementsByClassName('js-close-trigger')[0];
+    const remoteVideo = callPanel.getElementsByClassName('js-remote-stream')[0];
+
+    function addEvents(mediaConnection) {
+      callPanel.getElementsByClassName('heading')[0].innerText = mediaConnection.id;
 
       mediaConnection.on('stream', async stream => {
         // Render remote stream for caller
@@ -70,34 +93,23 @@ const Peer = window.Peer;
       mediaConnection.once('close', () => {
         remoteVideo.srcObject.getTracks().forEach(track => track.stop());
         remoteVideo.srcObject = null;
+
+        dispose();
       });
 
-      closeTrigger.addEventListener('click', () => mediaConnection.close(true));
-    });
-
-    peer.once('open', id => (localId.textContent = id));
-
-    // Register callee handler
-    peer.on('call', mediaConnection => {
-      mediaConnection.answer(localStream, callOptions);
-
-      mediaConnection.on('stream', async stream => {
-        // Render remote stream for callee
-        remoteVideo.srcObject = stream;
-        remoteVideo.playsInline = true;
-        await remoteVideo.play().catch(console.error);
+      closeTrigger.addEventListener('click', () => {
+        mediaConnection.close(true)
       });
 
-      mediaConnection.once('close', () => {
-        remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-        remoteVideo.srcObject = null;
-      });
+      function dispose() {
+        delete mediaConnections[mediaConnection.id]
+        $callPanel.remove();
+      }
+    }
 
-      closeTrigger.addEventListener('click', () => mediaConnection.close(true));
-    });
-  });
-
-
-
+    return {
+      addEvents: addEvents
+    }
+  }
 
 })();
