@@ -5,14 +5,29 @@ const getRoomModeByHash = () => (location.hash === '#sfu' ? 'sfu' : 'mesh');
 
 // 簡易的なオブザーバー作成器
 // const observable = enhance({});
-// observable.__after_set__.test = function(target, prop, value) { console.log(target, prop, value); }
+// observable.$after_set.test = function(target, prop, value) { console.log(target, prop, value); }
 // observable.test = "123";
 function enhance(obj) {
-  obj['__after_set__'] = {}
+  const after_set_key = '$after_set'
+
+  obj[after_set_key] = new Proxy({}, {
+    set: function (target, prop, value) {
+      if(!obj.hasOwnProperty(prop)) {
+        throw Error(`プロパティの新規追加はできません: ${prop}`)
+      }
+
+      Reflect.set(target, prop, value);
+    }
+  });
+
   return new Proxy(obj, {
     set: function (target, prop, value) {
+      if(!obj.hasOwnProperty(prop)) {
+        throw Error(`プロパティの新規追加はできません: ${prop}`)
+      }
+
       Reflect.set(target, prop, value);
-      const listener = obj.__after_set__[prop];
+      const listener = obj[after_set_key][prop];
       if (listener) {
         listener(target, prop, value);
       }
@@ -20,17 +35,24 @@ function enhance(obj) {
   });
 }
 
+
 function createRecorder() {
   const speech = new SpeechRecognition();
 
   const instance = enhance({
+    text: '',
+    autoRestart: true,
+    enabled: false,
     start: function () {
-      // console.log('recorder start');
+      console.log('recorder start');
       speech.start();
     },
     stop: function () {
-      // console.log('recorder stop');
+      console.log('recorder stop');
       speech.stop();
+    },
+    canAutoRestart: function() {
+      return this.autoRestart && this.enabled
     }
   });
 
@@ -53,8 +75,10 @@ function createRecorder() {
   });
 
   speech.addEventListener('end', () => {
-    console.log('on end')
-    instance.start()
+    console.log('on end');
+    if(instance.canAutoRestart()) {
+      instance.start();
+    }
   });
 
   return instance;
@@ -80,40 +104,52 @@ function createRecorder() {
   const sendTrigger = document.getElementById('js-send-trigger');
   const localVideo = document.getElementById('js-local-stream');
 
+  function appendMessage(text) {
+    messages.textContent += `${text}\n`;
+  }
+
+  const constraints = {
+    audio: true,
+    video: {
+      width: 280,
+      height: 220,
+      facingMode: "user"
+    }
+  };
+
+  const localStream = await navigator.mediaDevices
+    .getUserMedia(constraints)
+    .catch(console.error);
+
+  // Render local stream
+  localVideo.muted = true;
+  localVideo.srcObject = localStream;
+  localVideo.playsInline = true;
+  await localVideo.play().catch(console.error);
+
+
   async function createRoom(peer) {
+    const status_left = 'left';
+    const status_joined = 'joined';
+
     var room = null;
     const instance = enhance({
-      status: 'left',
+      status: status_left,
+      localText: '',
       send: function (text) {
         room.send(text);
       },
       close: function () {
         room.close();
+      },
+      is_joined: function(){
+        return this.status === status_joined;
       }
     });
-
-    const constraints = {
-      audio: true,
-      video: {
-        width: 280,
-        height: 220,
-        facingMode: "user"
-      }
-    };
 
     const callOptions = {
       videoBandwidth: 1
     };
-
-    const localStream = await navigator.mediaDevices
-      .getUserMedia(constraints)
-      .catch(console.error);
-
-    // Render local stream
-    localVideo.muted = true;
-    localVideo.srcObject = localStream;
-    localVideo.playsInline = true;
-    await localVideo.play().catch(console.error);
 
     // Register join handler
     joinTrigger.addEventListener('click', () => {
@@ -131,10 +167,10 @@ function createRecorder() {
       room = peer.joinRoom(roomId.value, roomOptions);
 
       room.once('open', () => {
-        instance.status = 'joined'
+        instance.status = status_joined
       });
       room.on('peerJoin', peerId => {
-        messages.textContent += `=== ${peerId} が退室しました ===\n`;
+        appendMessage(`=== ${peerId} が入室しました ===`);
       });
 
       // Render remote stream for new peer join in the room
@@ -153,7 +189,7 @@ function createRecorder() {
         src
       }) => {
         // Show a message sent to the room and who sent
-        messages.textContent += `${src}: ${data}\n`;
+        appendMessage(`${src}: ${data}`);
       });
 
       // for closing room members
@@ -165,13 +201,13 @@ function createRecorder() {
         remoteVideo.srcObject = null;
         remoteVideo.remove();
 
-        messages.textContent += `=== ${peerId} が退室しました ===\n`;
+        appendMessage(`=== ${peerId} が退室しました ===`);
       });
 
       // for closing myself
       room.once('close', () => {
         sendTrigger.removeEventListener('click', onClickSend);
-        instance.status = 'left';
+        instance.status = status_left;
         Array.from(remoteVideos.children).forEach(remoteVideo => {
           remoteVideo.srcObject.getTracks().forEach(track => track.stop());
           remoteVideo.srcObject = null;
@@ -217,35 +253,36 @@ function createRecorder() {
   peer.on('error', console.error);
 
   const recorder = createRecorder();
-  const room = await createRoom(peer, recorder);
+  const room = await createRoom(peer);
 
-  room.__after_set__.localText = function(target, prop, value) {
+  room.$after_set.localText = function(target, prop, value) {
     if(value !== '') {
-      messages.textContent += `${peer.id}: ${value}\n`;
+      appendMessage(`${peer.id}: ${value}`);
     }
   }
 
-  room.__after_set__.status = function(target, prop, value) {
-    if(value == 'joined') {
-      messages.textContent += '=== 入室しました ===\n';
+  room.$after_set.status = function(target, prop, value) {
+    if(target.is_joined()) {
+      appendMessage('=== 入室しました ===');
+      recorder.autoRestart = true
       recorder.start();
     } else {
-      messages.textContent += '== 退室しました ===\n';
+      appendMessage('== 退室しました ===');
+      recorder.autoRestart = false
       recorder.stop();
     }
   }
 
-  recorder.__after_set__.text = function (target, prop, value) {
+  recorder.$after_set.text = function (target, prop, value) {
     console.log('text event!')
 
-    const line = value + '\n'
-    messages.textContent += line;
-    room.send(line);
+    appendMessage(value);
+    room.send(`${value}\n`);
 
     if (value == "さよなら" || value == "バイバイ") {
       // 側によるを作ったら、「xxxちょっといい？」でxxxさんに寄る
       const closeMessage = '[コマンド一致！]退室します\n';
-      messages.textContent += closeMessage;
+      appendMessage(closeMessage);
       room.send(closeMessage);
       room.close();
     }
