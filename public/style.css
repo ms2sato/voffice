@@ -76,19 +76,32 @@ video {
   margin-top: 0;
 }
 
-.leave-trigger{
+body.left .leave-trigger {
   display: none;
 }
 
-body.joined .join-trigger{
-  display: none;
+body.left #js-room-id {
+  pointer-events: initial;
+  opacity: 1;
 }
 
-body.joined .leave-trigger{
+body.left .join-trigger {
   display: initial;
 }
 
-body.joined #js-room-id {
+body.joining .leave-trigger {
+  display: none;
+}
+
+.join-trigger {
+  display: none;
+}
+
+.leave-trigger {
+  display: initial;
+}
+
+#js-room-id {
   pointer-events: none;
   opacity: 0.5;
 }

@@ -193,7 +193,7 @@ function createRecorder() {
     navigator.msGetUserMedia;
 
   if(!mediaDevices) {
-    alert('このデバイスではご利用できません');
+    alert('このデバイスではご利用できません。ブラウザが古いか、モバイルの場合にはHTTPSで無いと動作しない可能性が高いです。');
     return;
   }
 
@@ -210,6 +210,7 @@ function createRecorder() {
 
   async function createRoom(peer) {
     const status_left = 'left';
+    const status_joining = 'joining';
     const status_joined = 'joined';
 
     var room = null;
@@ -224,6 +225,9 @@ function createRecorder() {
       },
       is_joined: function(){
         return this.status === status_joined;
+      },
+      is_joining: function(){
+        return this.status === status_joining;
       }
     });
 
@@ -250,6 +254,7 @@ function createRecorder() {
       }, callOptions);
 
       room = peer.joinRoom(roomId.value, roomOptions);
+      instance.status = status_joining;
 
       room.once('open', () => {
         instance.status = status_joined
@@ -347,18 +352,25 @@ function createRecorder() {
   }
 
   room.$after_set.status = function(target, prop, value) {
-    if(target.is_joined()) {
+    if(target.is_joining()) {
+      appendMessage('=== 入室待ちです... ===');
+
+      document.body.classList.add("joining");
+      document.body.classList.remove("left");
+    } else if(target.is_joined()) {
       appendMessage('=== 入室しました ===');
       recorder.autoRestart = true
       recorder.start();
 
-      document.body.classList.add("joined");
+      document.body.classList.remove("left");
+      document.body.classList.remove("joining");
     } else {
       appendMessage('== 退室しました ===');
       recorder.autoRestart = false
       recorder.stop();
 
-      document.body.classList.remove("joined");
+      document.body.classList.add("left");
+      document.body.classList.remove("joining");
     }
   }
 
