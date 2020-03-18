@@ -37,6 +37,22 @@ function enhance(obj) {
 
 
 function createRecorder() {
+  if(!SpeechRecognition) {
+    return enhance({
+      text: '',
+      autoRestart: true,
+      enabled: false,
+      start: function () {
+      },
+      stop: function () {
+      },
+      canAutoRestart: function() {
+        return this.autoRestart && this.enabled
+      }
+    });
+  };
+
+
   const speech = new SpeechRecognition();
 
   const instance = enhance({
@@ -117,7 +133,17 @@ function createRecorder() {
     }
   };
 
-  const localStream = await navigator.mediaDevices
+  const mediaDevices = navigator.mediaDevices ||
+    navigator.webkitGetUserMedia ||
+    navigator.mozGetUserMedia ||
+    navigator.msGetUserMedia;
+
+  if(!mediaDevices) {
+    alert('このデバイスではご利用できません');
+    return;
+  }
+
+  const localStream = await mediaDevices
     .getUserMedia(constraints)
     .catch(console.error);
 
