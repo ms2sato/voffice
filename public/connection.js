@@ -4,26 +4,39 @@ const SpeechGrammarList = window.webkitSpeechGrammarList || window.SpeechGrammar
 const getRoomModeByHash = () => (location.hash === '#sfu' ? 'sfu' : 'mesh');
 
 // 簡易的なオブザーバー作成器
-// const observable = enhance({});
+// const observable = enhance({test: "111"});
 // observable.$after_set.test = function(target, prop, value) { console.log(target, prop, value); }
 // observable.test = "123";
 function enhance(obj) {
-  const after_set_key = '$after_set'
+  if(Array.isArray(obj)) {
+    return enhanceArray(obj)
+  } else {
+    return enhanceObject(obj);
+  }
+}
 
-  obj[after_set_key] = new Proxy({}, {
+function avoidInsert(obj) {
+  return new Proxy({}, {
     set: function (target, prop, value) {
       if(!obj.hasOwnProperty(prop)) {
-        throw Error(`プロパティの新規追加はできません: ${prop}`)
+        throw Error(`new propety cannot set: ${prop}`)
       }
 
       Reflect.set(target, prop, value);
     }
   });
+}
+
+function enhanceObject(obj) {
+  const after_set_key = '$after_set';
+  const enhanceKeys = [after_set_key];
+
+  enhanceKeys.forEach (enhanceKey => { obj[enhanceKey] = avoidInsert(obj); })
 
   return new Proxy(obj, {
     set: function (target, prop, value) {
       if(!obj.hasOwnProperty(prop)) {
-        throw Error(`プロパティの新規追加はできません: ${prop}`)
+        throw Error(`new propety cannot set: ${prop}`)
       }
 
       Reflect.set(target, prop, value);
@@ -31,17 +44,59 @@ function enhance(obj) {
       if (listener) {
         listener(target, prop, value);
       }
+      return true;
+    },
+    has (target, key) {
+      if (enhanceKeys.includes(key)) {
+        return false;
+      }
+      return key in target;
     }
   });
 }
 
+function enhanceArray(array) {
+  const after_insert_key = '$after_insert';
+  const after_update_key = '$after_update';
+  const after_delete_key = '$after_delete';
+  const enhanceKeys = [after_insert_key, after_update_key, after_delete_key];
+
+  enhanceKeys.forEach (enhanceKey => { array[enhanceKey] = avoidInsert(array); })
+
+  return new Proxy(array, {
+    deleteProperty: function(target, prop, value) {
+      Reflect.set(target, prop, value);
+      if(!isNaN(prop)) {
+        const listener = array[after_delete_key];
+        if (listener) { listener(target, prop, value); }
+      }
+      return true;
+    },
+    set: function(target, prop, value) {
+      const isInsert = target[prop] === undefined;
+      Reflect.set(target, prop, value);
+      if(!isNaN(prop)) {
+        const key = isInsert ? after_insert_key : after_update_key;
+        const listener = array[key];
+        if (listener) { listener(target, prop, value); }
+      }
+      return true;
+    },
+    has (target, key) {
+      if (enhanceKeys.includes(key)) {
+        return false;
+      }
+      return key in target;
+    }
+  });
+}
 
 function createRecorder() {
   if(!SpeechRecognition) {
     return enhance({
       text: '',
       autoRestart: true,
-      enabled: false,
+      enabled: true,
       start: function () {
       },
       stop: function () {
@@ -51,7 +106,6 @@ function createRecorder() {
       }
     });
   };
-
 
   const speech = new SpeechRecognition();
 
@@ -185,6 +239,11 @@ function createRecorder() {
         return;
       }
 
+      if(roomId.value === "") {
+        alert('Room Nameを入れてください');
+        return;
+      }
+
       const roomOptions = Object.assign({
         mode: getRoomModeByHash(),
         stream: localStream
@@ -292,10 +351,14 @@ function createRecorder() {
       appendMessage('=== 入室しました ===');
       recorder.autoRestart = true
       recorder.start();
+
+      document.body.classList.add("joined");
     } else {
       appendMessage('== 退室しました ===');
       recorder.autoRestart = false
       recorder.stop();
+
+      document.body.classList.remove("joined");
     }
   }
 
@@ -313,5 +376,4 @@ function createRecorder() {
       room.close();
     }
   }
-
 })();

@@ -75,3 +75,20 @@ video {
   padding: 8px;
   margin-top: 0;
 }
+
+.leave-trigger{
+  display: none;
+}
+
+body.joined .join-trigger{
+  display: none;
+}
+
+body.joined .leave-trigger{
+  display: initial;
+}
+
+body.joined #js-room-id {
+  pointer-events: none;
+  opacity: 0.5;
+}
