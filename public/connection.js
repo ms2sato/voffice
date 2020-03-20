@@ -231,24 +231,24 @@ async function createRoom(peer) {
   const distanceReceiver = enhance({
     matrix: {},
     src: null,
-    getNormalizedVolumes: function () {
-      const peerId2Volume = {};
+    normalizedDistances: function () {
+      const peerId2Distance = {};
       for (var rowKey in this.matrix) {
         const row = this.matrix[rowKey];
         if (rowKey == peer.id) {
           if (row) {
-            Object.assign(peerId2Volume, row);
+            Object.assign(peerId2Distance, row);
           }
           continue;
         }
 
         const volume = row[peer.id];
         if (volume !== undefined) {
-          peerId2Volume[rowKey] = volume;
+          peerId2Distance[rowKey] = volume;
         }
       }
-      console.log(`peerIdVolume: ${peerIdVolume}`);
-      return peerId2Volume;
+      console.log(`peerId2Distance: ${peerId2Distance}`);
+      return peerId2Distance;
     }
   })
 
@@ -366,7 +366,7 @@ async function createRoom(peer) {
     nearTo: function (peerId) {
       const matrix = {};
       const subMatrix = {};
-      subMatrix[peerId] = 1;
+      subMatrix[peerId] = 0;
       matrix[peer.id] = subMatrix;
 
       protocols.distance.send(matrix);
@@ -389,6 +389,7 @@ async function createRoom(peer) {
         const video = panel.getElementsByTagName('video')[0];
         video.srcObject = stream;
         video.playsInline = true;
+        video.volume = 0.2;
         remoteVideos.append(panel);
         video.play().catch(console.error);
 
@@ -404,7 +405,7 @@ async function createRoom(peer) {
       setVolume(value) {
         console.log(`setVolume: ${value}`);
 
-        if (value < 0 || 1 < volume) {
+        if (value < 0 || 1 < value) {
           throw `Volume out of range(0 to 1.0): ${value}`
         }
         this.video.volume = value;
@@ -603,10 +604,10 @@ async function createRoom(peer) {
   }
 
   room.distanceReceiver.$afterSet.matrix = function (target, prop, value) {
-    const peerId2Volume = target.getNormalizedVolumes();
-    for (var peerId in peerId2Volume) {
+    const peerId2Distance = target.normalizedDistances();
+    for (var peerId in peerId2Distance) {
       const videoPanel = videoPanels.get(peerId);
-      videoPanel.setVolume(peerId2Volume[peerId]);
+      videoPanel.setVolume(1 - peerId2Distance[peerId]);
     }
   }
 
