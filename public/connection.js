@@ -5,7 +5,7 @@ const getRoomModeByHash = () => (location.hash === '#sfu' ? 'sfu' : 'mesh');
 
 // 簡易的なオブザーバー作成器
 // const observable = enhance({test: "111"});
-// observable.$after_set.test = function(target, prop, value) { console.log(target, prop, value); }
+// observable.$afterSet.test = function(target, prop, value) { console.log(target, prop, value); }
 // observable.test = "123";
 function enhance(obj) {
   if(Array.isArray(obj)) {
@@ -28,8 +28,8 @@ function avoidInsert(obj) {
 }
 
 function enhanceObject(obj) {
-  const after_set_key = '$after_set';
-  const enhanceKeys = [after_set_key];
+  const afterSetKey = '$afterSet';
+  const enhanceKeys = [afterSetKey];
 
   enhanceKeys.forEach (enhanceKey => { obj[enhanceKey] = avoidInsert(obj); })
 
@@ -40,7 +40,7 @@ function enhanceObject(obj) {
       }
 
       Reflect.set(target, prop, value);
-      const listener = obj[after_set_key][prop];
+      const listener = obj[afterSetKey][prop];
       if (listener) {
         listener(target, prop, value);
       }
@@ -56,10 +56,10 @@ function enhanceObject(obj) {
 }
 
 function enhanceArray(array) {
-  const after_insert_key = '$after_insert';
-  const after_update_key = '$after_update';
-  const after_delete_key = '$after_delete';
-  const enhanceKeys = [after_insert_key, after_update_key, after_delete_key];
+  const afterInsertKey = '$afterInsert';
+  const afterUpdateKey = '$afterUpdate';
+  const afterDeleteKey = '$afterDelete';
+  const enhanceKeys = [afterInsertKey, afterUpdateKey, afterDeleteKey];
 
   enhanceKeys.forEach (enhanceKey => { array[enhanceKey] = avoidInsert(array); })
 
@@ -67,7 +67,7 @@ function enhanceArray(array) {
     deleteProperty: function(target, prop, value) {
       Reflect.set(target, prop, value);
       if(!isNaN(prop)) {
-        const listener = array[after_delete_key];
+        const listener = array[afterDeleteKey];
         if (listener) { listener(target, prop, value); }
       }
       return true;
@@ -76,7 +76,7 @@ function enhanceArray(array) {
       const isInsert = target[prop] === undefined;
       Reflect.set(target, prop, value);
       if(!isNaN(prop)) {
-        const key = isInsert ? after_insert_key : after_update_key;
+        const key = isInsert ? afterInsertKey : afterUpdateKey;
         const listener = array[key];
         if (listener) { listener(target, prop, value); }
       }
@@ -209,25 +209,25 @@ function createRecorder() {
 
 
   async function createRoom(peer) {
-    const status_left = 'left';
-    const status_joining = 'joining';
-    const status_joined = 'joined';
+    const statusLeft = 'left';
+    const statusJoining = 'joining';
+    const statusJoined = 'joined';
 
     var room = null;
     const instance = enhance({
-      status: status_left,
+      status: statusLeft,
       localText: '',
-      send: function (text) {
+      sendMessage: function (text) {
         room.send(text);
       },
       close: function () {
         room.close();
       },
-      is_joined: function(){
-        return this.status === status_joined;
+      isJoined: function(){
+        return this.status === statusJoined;
       },
-      is_joining: function(){
-        return this.status === status_joining;
+      isJoining: function(){
+        return this.status === statusJoining;
       }
     });
 
@@ -254,10 +254,10 @@ function createRecorder() {
       }, callOptions);
 
       room = peer.joinRoom(roomId.value, roomOptions);
-      instance.status = status_joining;
+      instance.status = statusJoining;
 
       room.once('open', () => {
-        instance.status = status_joined
+        instance.status = statusJoined
       });
       room.on('peerJoin', peerId => {
         appendMessage(`=== ${peerId} が入室しました ===`);
@@ -297,7 +297,7 @@ function createRecorder() {
       // for closing myself
       room.once('close', () => {
         sendTrigger.removeEventListener('click', onClickSend);
-        instance.status = status_left;
+        instance.status = statusLeft;
         Array.from(remoteVideos.children).forEach(remoteVideo => {
           remoteVideo.srcObject.getTracks().forEach(track => track.stop());
           remoteVideo.srcObject = null;
@@ -312,7 +312,7 @@ function createRecorder() {
 
       function onClickSend() {
         // Send message to all of the peers in the room via websocket
-        room.send(localText.value);
+        instance.sendMessage(localText.value);
         instance.localText = localText.value;
         localText.value = '';
       }
@@ -345,19 +345,19 @@ function createRecorder() {
   const recorder = createRecorder();
   const room = await createRoom(peer);
 
-  room.$after_set.localText = function(target, prop, value) {
+  room.$afterSet.localText = function(target, prop, value) {
     if(value !== '') {
       appendMessage(`${peer.id}: ${value}`);
     }
   }
 
-  room.$after_set.status = function(target, prop, value) {
-    if(target.is_joining()) {
+  room.$afterSet.status = function(target, prop, value) {
+    if(target.isJoining()) {
       appendMessage('=== 入室待ちです... ===');
 
       document.body.classList.add("joining");
       document.body.classList.remove("left");
-    } else if(target.is_joined()) {
+    } else if(target.isJoined()) {
       appendMessage('=== 入室しました ===');
       recorder.autoRestart = true
       recorder.start();
@@ -374,17 +374,17 @@ function createRecorder() {
     }
   }
 
-  recorder.$after_set.text = function (target, prop, value) {
+  recorder.$afterSet.text = function (target, prop, value) {
     console.log('text event!')
 
     appendMessage(value);
-    room.send(`${value}\n`);
+    room.sendMessage(`${value}\n`);
 
     if (value == "さよなら" || value == "バイバイ") {
       // 側によるを作ったら、「xxxちょっといい？」でxxxさんに寄る
       const closeMessage = '[コマンド一致！]退室します\n';
       appendMessage(closeMessage);
-      room.send(closeMessage);
+      room.sendMessage(closeMessage);
       room.close();
     }
   }
