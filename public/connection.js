@@ -88,10 +88,11 @@ function enhanceMap(obj) {
       return true;
     },
     deleteProperty: function (target, prop, value) {
+      const willDelete = target[prop];
       Reflect.deleteProperty(target, prop, value);
       const listener = obj[afterDeleteKey];
       if (listener) {
-        listener(target, prop, value);
+        listener(target, prop, willDelete);
       }
       return true;
     },
@@ -370,11 +371,6 @@ function createRecorder() {
       room.once('close', () => {
         sendTrigger.removeEventListener('click', onClickSend);
         instance.status = statusLeft;
-        Array.from(remoteVideos.children).forEach(remoteVideo => {
-          remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-          remoteVideo.srcObject = null;
-          remoteVideo.remove();
-        });
       });
 
       sendTrigger.addEventListener('click', onClickSend);
@@ -441,14 +437,18 @@ function createRecorder() {
       recorder.autoRestart = false
       recorder.stop();
 
+      Array.from(remoteVideos.children).forEach(remoteVideo => {
+        remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+        remoteVideo.srcObject = null;
+        remoteVideo.remove();
+      });
+
       document.body.classList.add("left");
       document.body.classList.remove("joining");
     }
   }
 
   room.peers.$afterSet = function(target, prop, value) {
-    console.log('peeer:', prop, value);
-
     const stream = value.stream;
 
     const newVideo = document.createElement('video');
