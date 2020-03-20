@@ -1,6 +1,3 @@
-const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-const SpeechGrammarList = window.webkitSpeechGrammarList || window.SpeechGrammarList;
-
 const getRoomModeByHash = () => (location.hash === '#sfu' ? 'sfu' : 'mesh');
 
 // 簡易的なオブザーバー作成器
@@ -9,15 +6,15 @@ const getRoomModeByHash = () => (location.hash === '#sfu' ? 'sfu' : 'mesh');
 // observable.test = "123";
 function enhance(obj) {
   if (Array.isArray(obj)) {
-    return enhanceArray(obj);
+    return enhance.asArray(obj);
   } else if (obj instanceof Map) {
-    return enhanceMap(obj);
+    return enhance.asMap(obj);
   } else {
-    return enhanceObject(obj);
+    return enhance.asObject(obj);
   }
 }
 
-function avoidInsert(obj) {
+enhance.avoidInsert = function avoidInsert(obj) {
   return new Proxy({}, {
     set: function (target, prop, value) {
       if (!obj.hasOwnProperty(prop)) {
@@ -29,12 +26,12 @@ function avoidInsert(obj) {
   });
 }
 
-function enhanceObject(obj) {
+enhance.asObject = function asObject(obj) {
   const afterSetKey = '$afterSet';
   const enhanceKeys = [afterSetKey];
 
   enhanceKeys.forEach(enhanceKey => {
-    obj[enhanceKey] = avoidInsert(obj);
+    obj[enhanceKey] = enhance.avoidInsert(obj);
   })
 
   return new Proxy(obj, {
@@ -64,7 +61,7 @@ function enhanceObject(obj) {
   });
 }
 
-function enhanceMap(obj) {
+enhance.asMap = function asMap(obj) {
   const afterSetKey = '$afterSet';
   const afterDeleteKey = '$afterDelete';
   const enhanceKeys = [afterSetKey, afterDeleteKey];
@@ -106,14 +103,14 @@ function enhanceMap(obj) {
 
 }
 
-function enhanceArray(array) {
+enhance.asArray = function asArray(array) {
   const afterInsertKey = '$afterInsert';
   const afterUpdateKey = '$afterUpdate';
   const afterDeleteKey = '$afterDelete';
   const enhanceKeys = [afterInsertKey, afterUpdateKey, afterDeleteKey];
 
   enhanceKeys.forEach(enhanceKey => {
-    array[enhanceKey] = avoidInsert(array);
+    array[enhanceKey] = enhance.avoidInsert(array);
   })
 
   return new Proxy(array, {
@@ -154,6 +151,9 @@ function enhanceArray(array) {
 }
 
 function createRecorder() {
+  const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
+  const SpeechGrammarList = window.webkitSpeechGrammarList || window.SpeechGrammarList;
+
   if (!SpeechRecognition) {
     return enhance({
       text: '',
@@ -228,13 +228,37 @@ async function createRoom(peer) {
     src: null
   });
 
+  const distanceReceiver = enhance({
+    matrix: {},
+    src: null,
+    getNormalizedVolumes: function () {
+      const peerId2Volume = {};
+      for (var rowKey in this.matrix) {
+        const row = this.matrix[rowKey];
+        if (rowKey == peer.id) {
+          if (row) {
+            Object.assign(peerId2Volume, row);
+          }
+          continue;
+        }
+
+        const volume = row[peer.id];
+        if (volume !== undefined) {
+          peerId2Volume[rowKey] = volume;
+        }
+      }
+      console.log(`peerIdVolume: ${peerIdVolume}`);
+      return peerId2Volume;
+    }
+  })
+
   const protocols = {
     text: {
       send: function (text) {
         room.send({
           type: 'text',
           body: text
-        })
+        });
       },
       receive: function ({
         data,
@@ -247,7 +271,24 @@ async function createRoom(peer) {
         textReceiver.body = data.body;
       }
     },
-    distance: {},
+    distance: {
+      send: function (matrix) {
+        room.send({
+          type: 'distance',
+          matrix: matrix
+        });
+      },
+      receive: function ({
+        data,
+        src
+      }) {
+        if (data.type != 'distance') {
+          throw `Illegal type expect: distance, got: ${data.type}`
+        }
+        distanceReceiver.src = src;
+        distanceReceiver.matrix = data.matrix;
+      }
+    },
     dispatch: function (pack) {
       console.log(pack);
       const protocolType = this[pack.data.type];
@@ -258,7 +299,7 @@ async function createRoom(peer) {
     }
   }
 
-  const peers = enhanceMap({});
+  const peers = enhance.asMap({});
 
   function join(roomId, localStream, mode = 'mesh') {
     // Note that you need to ensure the peer has connected to signaling server
@@ -306,28 +347,119 @@ async function createRoom(peer) {
   const instance = enhance({
     status: statusLeft,
     localText: '',
-    sendMessage: function (text) {
-      protocols.text.send(text);
-    },
-    close: function () {
-      room.close();
-    },
+    textReceiver: textReceiver,
+    distanceReceiver: distanceReceiver,
+    peers: peers,
+    join: join,
     isJoined: function () {
-      return this.status === statusJoined;
+      return this.status == statusJoined;
     },
     isJoining: function () {
-      return this.status === statusJoining;
+      return this.status == statusJoining;
     },
-    textReceiver: textReceiver,
-    peers: peers,
-    join: join
+    close: function () {
+      room.close()
+    },
+    sendMessage: function (text) {
+      protocols.text.send(text)
+    },
+    nearTo: function (peerId) {
+      const matrix = {};
+      const subMatrix = {};
+      subMatrix[peerId] = 1;
+      matrix[peer.id] = subMatrix;
+
+      protocols.distance.send(matrix);
+    }
   });
 
   return instance;
 }
 
 (async function main() {
+  function createVideoPanels(room) {
+    class VideoPanel {
+
+      constructor(stream) {
+        const peerId = stream.peerId;
+
+        const panel = appendTo()
+        panel.setAttribute('data-peer-id', peerId);
+
+        const video = panel.getElementsByTagName('video')[0];
+        video.srcObject = stream;
+        video.playsInline = true;
+        remoteVideos.append(panel);
+        video.play().catch(console.error);
+
+        panel.getElementsByClassName('peer-id')[0].innerText = peerId;
+        panel.getElementsByClassName('near-to')[0].addEventListener('click', function () {
+          room.nearTo(peerId);
+        });
+
+        this.video = video;
+        this.peerId = peerId;
+      }
+
+      setVolume(value) {
+        console.log(`setVolume: ${value}`);
+
+        if (value < 0 || 1 < volume) {
+          throw `Volume out of range(0 to 1.0): ${value}`
+        }
+        this.video.volume = value;
+      }
+
+      remove() {
+        const remoteVideoPanel = document.querySelector(
+          `[data-peer-id="${this.peerId}"]`
+        );
+
+        const remoteVideo = remoteVideoPanel.getElementsByTagName('video')[0];
+        remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+        remoteVideo.srcObject = null;
+        remoteVideoPanel.remove();
+      }
+    }
+
+    const videoPanels = {};
+
+    return {
+      get: function (peerId) {
+        const panel = videoPanels[peerId];
+        if (!panel) {
+          throw `panel not found. peerId: ${peerId}`
+        }
+        return panel;
+      },
+      append: function (stream) {
+        const videoPanel = new VideoPanel(stream);
+        videoPanels[stream.peerId] = videoPanel;
+      },
+      remove: function (peerId) {
+        videoPanels[peerId].remove();
+        delete videoPanels[peerId];
+      },
+      removeAll: function () {
+        for (var key in videoPanels) {
+          if (!videoPanels.hasOwnProperty(key)) {
+            continue;
+          }
+          const remoteVideoPanel = videoPanels[key];
+          remoteVideoPanel.remove();
+        };
+        for (var key in videoPanels) {
+          if (!videoPanels.hasOwnProperty(key)) {
+            continue;
+          }
+          delete videoPanels[key];
+        }
+      }
+    }
+  }
+
   const callPanelTemplate = document.getElementById('callPanelTemplate').innerText;
+
   function appendTo() {
     const callPanels = remoteVideos;
     callPanels.insertAdjacentHTML('beforeend', callPanelTemplate);
@@ -402,6 +534,7 @@ async function createRoom(peer) {
 
   const recorder = createRecorder();
   const room = await createRoom(peer);
+  const videoPanels = createVideoPanels(room);
 
   // Register join handler
   joinTrigger.addEventListener('click', () => {
@@ -420,61 +553,6 @@ async function createRoom(peer) {
   });
 
   leaveTrigger.addEventListener('click', () => room.close());
-
-
-  function createVideoPanels() {
-    class VideoPanel {
-
-      constructor(stream) {
-        this.peerId = stream.peerId;
-
-        const panel = appendTo()
-        panel.setAttribute('data-peer-id', this.peerId);
-
-        const newVideo = panel.getElementsByTagName('video')[0];
-        newVideo.srcObject = stream;
-        newVideo.playsInline = true;
-        remoteVideos.append(panel);
-        newVideo.play().catch(console.error);
-      }
-
-      remove() {
-        const remoteVideoPanel = document.querySelector(
-          `[data-peer-id="${this.peerId}"]`
-        );
-
-        const remoteVideo = remoteVideoPanel.getElementsByTagName('video')[0];
-        remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-        remoteVideo.srcObject = null;
-        remoteVideoPanel.remove();
-      }
-    }
-
-    const videoPanels = {};
-
-    return {
-      append: function(stream){
-        const videoPanel = new VideoPanel(stream);
-        videoPanels[stream.peerId] = videoPanel;
-      },
-      remove: function(peerId) {
-        videoPanels[peerId].remove();
-        delete videoPanels[peerId];
-      },
-      removeAll: function() {
-        for(key in videoPanels) {
-          if (!videoPanels.hasOwnProperty(key)) { continue; }
-
-          const remoteVideoPanel = videoPanels[key];
-          remoteVideoPanel.remove();
-        };
-        for (var key in videoPanels) { delete videoPanels[key]; }
-      }
-    }
-  }
-
-  const videoPanels = createVideoPanels();
-
 
   room.$afterSet.localText = function (target, prop, value) {
     if (value !== '') {
@@ -524,11 +602,19 @@ async function createRoom(peer) {
     appendMessage(`${target.src}: ${target.body}`);
   }
 
+  room.distanceReceiver.$afterSet.matrix = function (target, prop, value) {
+    const peerId2Volume = target.getNormalizedVolumes();
+    for (var peerId in peerId2Volume) {
+      const videoPanel = videoPanels.get(peerId);
+      videoPanel.setVolume(peerId2Volume[peerId]);
+    }
+  }
+
   recorder.$afterSet.text = function (target, prop, value) {
     console.log('text event!')
 
     appendMessage(value);
-    room.sendMessage(`${value}\n`);
+    room.sendMessage(value);
 
     if (value == "さよなら" || value == "バイバイ") {
       // 側によるを作ったら、「xxxちょっといい？」でxxxさんに寄る
