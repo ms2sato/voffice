@@ -8,7 +8,7 @@ const getRoomModeByHash = () => (location.hash === '#sfu' ? 'sfu' : 'mesh');
 // observable.$afterSet.test = function(target, prop, value) { console.log(target, prop, value); }
 // observable.test = "123";
 function enhance(obj) {
-  if(Array.isArray(obj)) {
+  if (Array.isArray(obj)) {
     return enhanceArray(obj)
   } else {
     return enhanceObject(obj);
@@ -18,7 +18,7 @@ function enhance(obj) {
 function avoidInsert(obj) {
   return new Proxy({}, {
     set: function (target, prop, value) {
-      if(!obj.hasOwnProperty(prop)) {
+      if (!obj.hasOwnProperty(prop)) {
         throw Error(`new propety cannot set: ${prop}`)
       }
 
@@ -31,11 +31,13 @@ function enhanceObject(obj) {
   const afterSetKey = '$afterSet';
   const enhanceKeys = [afterSetKey];
 
-  enhanceKeys.forEach (enhanceKey => { obj[enhanceKey] = avoidInsert(obj); })
+  enhanceKeys.forEach(enhanceKey => {
+    obj[enhanceKey] = avoidInsert(obj);
+  })
 
   return new Proxy(obj, {
     set: function (target, prop, value) {
-      if(!obj.hasOwnProperty(prop)) {
+      if (!obj.hasOwnProperty(prop)) {
         throw Error(`new propety cannot set: ${prop}`)
       }
 
@@ -46,7 +48,7 @@ function enhanceObject(obj) {
       }
       return true;
     },
-    has (target, key) {
+    has(target, key) {
       if (enhanceKeys.includes(key)) {
         return false;
       }
@@ -61,28 +63,34 @@ function enhanceArray(array) {
   const afterDeleteKey = '$afterDelete';
   const enhanceKeys = [afterInsertKey, afterUpdateKey, afterDeleteKey];
 
-  enhanceKeys.forEach (enhanceKey => { array[enhanceKey] = avoidInsert(array); })
+  enhanceKeys.forEach(enhanceKey => {
+    array[enhanceKey] = avoidInsert(array);
+  })
 
   return new Proxy(array, {
-    deleteProperty: function(target, prop, value) {
+    deleteProperty: function (target, prop, value) {
       Reflect.set(target, prop, value);
-      if(!isNaN(prop)) {
+      if (!isNaN(prop)) {
         const listener = array[afterDeleteKey];
-        if (listener) { listener(target, prop, value); }
+        if (listener) {
+          listener(target, prop, value);
+        }
       }
       return true;
     },
-    set: function(target, prop, value) {
+    set: function (target, prop, value) {
       const isInsert = target[prop] === undefined;
       Reflect.set(target, prop, value);
-      if(!isNaN(prop)) {
+      if (!isNaN(prop)) {
         const key = isInsert ? afterInsertKey : afterUpdateKey;
         const listener = array[key];
-        if (listener) { listener(target, prop, value); }
+        if (listener) {
+          listener(target, prop, value);
+        }
       }
       return true;
     },
-    has (target, key) {
+    has(target, key) {
       if (enhanceKeys.includes(key)) {
         return false;
       }
@@ -92,16 +100,14 @@ function enhanceArray(array) {
 }
 
 function createRecorder() {
-  if(!SpeechRecognition) {
+  if (!SpeechRecognition) {
     return enhance({
       text: '',
       autoRestart: true,
       enabled: true,
-      start: function () {
-      },
-      stop: function () {
-      },
-      canAutoRestart: function() {
+      start: function () {},
+      stop: function () {},
+      canAutoRestart: function () {
         return this.autoRestart && this.enabled
       }
     });
@@ -121,7 +127,7 @@ function createRecorder() {
       console.log('recorder stop');
       speech.stop();
     },
-    canAutoRestart: function() {
+    canAutoRestart: function () {
       return this.autoRestart && this.enabled
     }
   });
@@ -146,7 +152,7 @@ function createRecorder() {
 
   speech.addEventListener('end', () => {
     console.log('on end');
-    if(instance.canAutoRestart()) {
+    if (instance.canAutoRestart()) {
       instance.start();
     }
   });
@@ -192,7 +198,7 @@ function createRecorder() {
     navigator.mozGetUserMedia ||
     navigator.msGetUserMedia;
 
-  if(!mediaDevices) {
+  if (!mediaDevices) {
     alert('このデバイスではご利用できません。ブラウザが古いか、モバイルの場合にはHTTPSで無いと動作しない可能性が高いです。');
     return;
   }
@@ -213,22 +219,49 @@ function createRecorder() {
     const statusJoining = 'joining';
     const statusJoined = 'joined';
 
+    const textReceiver = enhance({body: null, src: null})
+
+    const protocols = {
+      text: {
+        send: function (text) {
+          room.send({
+            type: 'text',
+            body: text
+          })
+        },
+        receive: function({data, src}) {
+          if(data.type != 'text') { throw `Illegal type expect: text, got: ${data.type}` }
+          textReceiver.src = src;
+          textReceiver.body = data.body;
+        }
+      },
+      distance: {
+      },
+      dispatch: function(pack){
+        console.log(pack);
+        const protocolType = this[pack.data.type];
+        if(protocolType === undefined) { throw `Illegal protocol type: ${pack.data.type}` }
+        protocolType.receive(pack);
+      }
+    }
+
     var room = null;
     const instance = enhance({
       status: statusLeft,
       localText: '',
       sendMessage: function (text) {
-        room.send(text);
+        protocols.text.send(text);
       },
       close: function () {
         room.close();
       },
-      isJoined: function(){
+      isJoined: function () {
         return this.status === statusJoined;
       },
-      isJoining: function(){
+      isJoining: function () {
         return this.status === statusJoining;
-      }
+      },
+      textReceiver: textReceiver
     });
 
     const callOptions = {
@@ -243,7 +276,7 @@ function createRecorder() {
         return;
       }
 
-      if(roomId.value === "") {
+      if (roomId.value === "") {
         alert('Room Nameを入れてください');
         return;
       }
@@ -274,12 +307,8 @@ function createRecorder() {
         await newVideo.play().catch(console.error);
       });
 
-      room.on('data', ({
-        data,
-        src
-      }) => {
-        // Show a message sent to the room and who sent
-        appendMessage(`${src}: ${data}`);
+      room.on('data', (pack) => {
+        protocols.dispatch(pack);
       });
 
       // for closing room members
@@ -345,19 +374,19 @@ function createRecorder() {
   const recorder = createRecorder();
   const room = await createRoom(peer);
 
-  room.$afterSet.localText = function(target, prop, value) {
-    if(value !== '') {
+  room.$afterSet.localText = function (target, prop, value) {
+    if (value !== '') {
       appendMessage(`${peer.id}: ${value}`);
     }
   }
 
-  room.$afterSet.status = function(target, prop, value) {
-    if(target.isJoining()) {
+  room.$afterSet.status = function (target, prop, value) {
+    if (target.isJoining()) {
       appendMessage('=== 入室待ちです... ===');
 
       document.body.classList.add("joining");
       document.body.classList.remove("left");
-    } else if(target.isJoined()) {
+    } else if (target.isJoined()) {
       appendMessage('=== 入室しました ===');
       recorder.autoRestart = true
       recorder.start();
@@ -372,6 +401,10 @@ function createRecorder() {
       document.body.classList.add("left");
       document.body.classList.remove("joining");
     }
+  }
+
+  room.textReceiver.$afterSet.body = function(target, prop, value) {
+    appendMessage(`${target.src}: ${target.body}`);
   }
 
   recorder.$afterSet.text = function (target, prop, value) {
