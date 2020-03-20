@@ -10,7 +10,7 @@ const getRoomModeByHash = () => (location.hash === '#sfu' ? 'sfu' : 'mesh');
 function enhance(obj) {
   if (Array.isArray(obj)) {
     return enhanceArray(obj);
-  } else if (obj instanceof Map){
+  } else if (obj instanceof Map) {
     return enhanceMap(obj);
   } else {
     return enhanceObject(obj);
@@ -214,13 +214,125 @@ function createRecorder() {
   return instance;
 }
 
+async function createRoom(peer) {
+  const statusLeft = 'left';
+  const statusJoining = 'joining';
+  const statusJoined = 'joined';
+
+  const callOptions = {
+    videoBandwidth: 1
+  };
+
+  const textReceiver = enhance({
+    body: null,
+    src: null
+  });
+
+  const protocols = {
+    text: {
+      send: function (text) {
+        room.send({
+          type: 'text',
+          body: text
+        })
+      },
+      receive: function ({
+        data,
+        src
+      }) {
+        if (data.type != 'text') {
+          throw `Illegal type expect: text, got: ${data.type}`
+        }
+        textReceiver.src = src;
+        textReceiver.body = data.body;
+      }
+    },
+    distance: {},
+    dispatch: function (pack) {
+      console.log(pack);
+      const protocolType = this[pack.data.type];
+      if (protocolType === undefined) {
+        throw `Illegal protocol type: ${pack.data.type}`
+      }
+      protocolType.receive(pack);
+    }
+  }
+
+  const peers = enhanceMap({});
+
+  function join(roomId, localStream, mode = 'mesh') {
+    // Note that you need to ensure the peer has connected to signaling server
+    // before using methods of peer instance.
+    if (!peer.open) {
+      return;
+    }
+
+    const roomOptions = Object.assign({
+      mode: mode,
+      stream: localStream
+    }, callOptions);
+
+    room = peer.joinRoom(roomId, roomOptions);
+    instance.status = statusJoining;
+
+    room.once('open', () => {
+      instance.status = statusJoined
+    });
+    room.on('peerJoin', peerId => {
+      console.log(`peerJoin: === ${peerId} が入室しました ===`);
+    });
+
+    // Render remote stream for new peer join in the room
+    room.on('stream', async stream => {
+      peers[stream.peerId] = stream;
+    });
+
+    room.on('data', (pack) => {
+      protocols.dispatch(pack);
+    });
+
+    // for closing room members
+    room.on('peerLeave', peerId => {
+      delete peers[peerId];
+    });
+
+    // for closing myself
+    room.once('close', () => {
+      instance.status = statusLeft;
+    });
+  }
+
+  var room = null;
+  const instance = enhance({
+    status: statusLeft,
+    localText: '',
+    sendMessage: function (text) {
+      protocols.text.send(text);
+    },
+    close: function () {
+      room.close();
+    },
+    isJoined: function () {
+      return this.status === statusJoined;
+    },
+    isJoining: function () {
+      return this.status === statusJoining;
+    },
+    textReceiver: textReceiver,
+    peers: peers,
+    join: join
+  });
+
+  return instance;
+}
+
 (async function main() {
   const callPanelTemplate = document.getElementById('callPanelTemplate').innerText;
-  // function appendTo() {
-  //   const callPanels = document.getElementsByClassName('call-panels')[0];
-  //   callPanels.insertAdjacentHTML('beforeend', callPanelTemplate);
-  //   return callPanels.querySelector('.call-panel:last-child');
-  // }
+  function appendTo() {
+    const callPanels = remoteVideos;
+    callPanels.insertAdjacentHTML('beforeend', callPanelTemplate);
+    return callPanels.querySelector('.call-panel:last-child');
+  }
 
   const meta = document.getElementById('js-meta');
   const sdkSrc = document.querySelector('script[src*=skyway]');
@@ -267,128 +379,6 @@ function createRecorder() {
   localVideo.playsInline = true;
   await localVideo.play().catch(console.error);
 
-
-  async function createRoom(peer) {
-    const statusLeft = 'left';
-    const statusJoining = 'joining';
-    const statusJoined = 'joined';
-
-    const textReceiver = enhance({body: null, src: null});
-
-    const protocols = {
-      text: {
-        send: function (text) {
-          room.send({
-            type: 'text',
-            body: text
-          })
-        },
-        receive: function({data, src}) {
-          if(data.type != 'text') { throw `Illegal type expect: text, got: ${data.type}` }
-          textReceiver.src = src;
-          textReceiver.body = data.body;
-        }
-      },
-      distance: {
-      },
-      dispatch: function(pack){
-        console.log(pack);
-        const protocolType = this[pack.data.type];
-        if(protocolType === undefined) { throw `Illegal protocol type: ${pack.data.type}` }
-        protocolType.receive(pack);
-      }
-    }
-
-    const peers = enhance(new Map());
-
-    var room = null;
-    const instance = enhance({
-      status: statusLeft,
-      localText: '',
-      sendMessage: function (text) {
-        protocols.text.send(text);
-      },
-      close: function () {
-        room.close();
-      },
-      isJoined: function () {
-        return this.status === statusJoined;
-      },
-      isJoining: function () {
-        return this.status === statusJoining;
-      },
-      textReceiver: textReceiver,
-      peers: peers
-    });
-
-    const callOptions = {
-      videoBandwidth: 1
-    };
-
-    // Register join handler
-    joinTrigger.addEventListener('click', () => {
-      // Note that you need to ensure the peer has connected to signaling server
-      // before using methods of peer instance.
-      if (!peer.open) {
-        return;
-      }
-
-      if (roomId.value === "") {
-        alert('Room Nameを入れてください');
-        return;
-      }
-
-      const roomOptions = Object.assign({
-        mode: getRoomModeByHash(),
-        stream: localStream
-      }, callOptions);
-
-      room = peer.joinRoom(roomId.value, roomOptions);
-      instance.status = statusJoining;
-
-      room.once('open', () => {
-        instance.status = statusJoined
-      });
-      room.on('peerJoin', peerId => {
-        appendMessage(`=== ${peerId} が入室しました ===`);
-      });
-
-      // Render remote stream for new peer join in the room
-      room.on('stream', async stream => {
-        peers[stream.peerId] = {stream};
-      });
-
-      room.on('data', (pack) => {
-        protocols.dispatch(pack);
-      });
-
-      // for closing room members
-      room.on('peerLeave', peerId => {
-        delete peers[peerId];
-      });
-
-      // for closing myself
-      room.once('close', () => {
-        sendTrigger.removeEventListener('click', onClickSend);
-        instance.status = statusLeft;
-      });
-
-      sendTrigger.addEventListener('click', onClickSend);
-      leaveTrigger.addEventListener('click', () => room.close(), {
-        once: true
-      });
-
-      function onClickSend() {
-        // Send message to all of the peers in the room via websocket
-        instance.sendMessage(localText.value);
-        instance.localText = localText.value;
-        localText.value = '';
-      }
-    });
-
-    return instance;
-  }
-
   meta.innerText = `
     UA: ${navigator.userAgent}
     SDK: ${sdkSrc ? sdkSrc.src : 'unknown'}
@@ -412,6 +402,79 @@ function createRecorder() {
 
   const recorder = createRecorder();
   const room = await createRoom(peer);
+
+  // Register join handler
+  joinTrigger.addEventListener('click', () => {
+    if (roomId.value === "") {
+      alert('Room Nameを入れてください');
+      return;
+    }
+
+    room.join(roomId.value, localStream, getRoomModeByHash());
+  });
+
+  sendTrigger.addEventListener('click', () => {
+    room.sendMessage(localText.value);
+    room.localText = localText.value;
+    localText.value = '';
+  });
+
+  leaveTrigger.addEventListener('click', () => room.close());
+
+
+  function createVideoPanels() {
+    class VideoPanel {
+
+      constructor(stream) {
+        this.peerId = stream.peerId;
+
+        const panel = appendTo()
+        panel.setAttribute('data-peer-id', this.peerId);
+
+        const newVideo = panel.getElementsByTagName('video')[0];
+        newVideo.srcObject = stream;
+        newVideo.playsInline = true;
+        remoteVideos.append(panel);
+        newVideo.play().catch(console.error);
+      }
+
+      remove() {
+        const remoteVideoPanel = document.querySelector(
+          `[data-peer-id="${this.peerId}"]`
+        );
+
+        const remoteVideo = remoteVideoPanel.getElementsByTagName('video')[0];
+        remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+        remoteVideo.srcObject = null;
+        remoteVideoPanel.remove();
+      }
+    }
+
+    const videoPanels = {};
+
+    return {
+      append: function(stream){
+        const videoPanel = new VideoPanel(stream);
+        videoPanels[stream.peerId] = videoPanel;
+      },
+      remove: function(peerId) {
+        videoPanels[peerId].remove();
+        delete videoPanels[peerId];
+      },
+      removeAll: function() {
+        for(key in videoPanels) {
+          if (!videoPanels.hasOwnProperty(key)) { continue; }
+
+          const remoteVideoPanel = videoPanels[key];
+          remoteVideoPanel.remove();
+        };
+        for (var key in videoPanels) { delete videoPanels[key]; }
+      }
+    }
+  }
+
+  const videoPanels = createVideoPanels();
+
 
   room.$afterSet.localText = function (target, prop, value) {
     if (value !== '') {
@@ -437,43 +500,27 @@ function createRecorder() {
       recorder.autoRestart = false
       recorder.stop();
 
-      Array.from(remoteVideos.children).forEach(remoteVideo => {
-        remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-        remoteVideo.srcObject = null;
-        remoteVideo.remove();
-      });
+      videoPanels.removeAll();
 
       document.body.classList.add("left");
       document.body.classList.remove("joining");
     }
   }
 
-  room.peers.$afterSet = function(target, prop, value) {
-    const stream = value.stream;
+  room.peers.$afterSet = function (target, prop, value) {
+    const stream = value;
+    appendMessage(`=== ${stream.peerId} が入室しました ===`);
 
-    const newVideo = document.createElement('video');
-    newVideo.srcObject = stream;
-    newVideo.playsInline = true;
-    // mark peerId to find it later at peerLeave event
-    newVideo.setAttribute('data-peer-id', stream.peerId);
-    remoteVideos.append(newVideo);
-    newVideo.play().catch(console.error);
+    videoPanels.append(stream);
   }
 
-  room.peers.$afterDelete = function(target, prop, value) {
-    const peerId = value.stream.peerId;
-
-    const remoteVideo = remoteVideos.querySelector(
-      `[data-peer-id=${peerId}]`
-    );
-    remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-    remoteVideo.srcObject = null;
-    remoteVideo.remove();
-
+  room.peers.$afterDelete = function (target, prop, value) {
+    const peerId = value.peerId;
+    videoPanels.remove(peerId);
     appendMessage(`=== ${peerId} が退室しました ===`);
   }
 
-  room.textReceiver.$afterSet.body = function(target, prop, value) {
+  room.textReceiver.$afterSet.body = function (target, prop, value) {
     appendMessage(`${target.src}: ${target.body}`);
   }
 
