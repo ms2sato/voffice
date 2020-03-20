@@ -9,7 +9,9 @@ const getRoomModeByHash = () => (location.hash === '#sfu' ? 'sfu' : 'mesh');
 // observable.test = "123";
 function enhance(obj) {
   if (Array.isArray(obj)) {
-    return enhanceArray(obj)
+    return enhanceArray(obj);
+  } else if (obj instanceof Map){
+    return enhanceMap(obj);
   } else {
     return enhanceObject(obj);
   }
@@ -37,6 +39,11 @@ function enhanceObject(obj) {
 
   return new Proxy(obj, {
     set: function (target, prop, value) {
+      if (enhanceKeys.includes(prop)) {
+        Reflect.set(target, prop, value);
+        return true;
+      }
+
       if (!obj.hasOwnProperty(prop)) {
         throw Error(`new propety cannot set: ${prop}`)
       }
@@ -57,6 +64,47 @@ function enhanceObject(obj) {
   });
 }
 
+function enhanceMap(obj) {
+  const afterSetKey = '$afterSet';
+  const afterDeleteKey = '$afterDelete';
+  const enhanceKeys = [afterSetKey, afterDeleteKey];
+
+  enhanceKeys.forEach(enhanceKey => {
+    obj[enhanceKey] = {};
+  })
+
+  return new Proxy(obj, {
+    set: function (target, prop, value) {
+      if (enhanceKeys.includes(prop)) {
+        Reflect.set(target, prop, value);
+        return true;
+      }
+
+      Reflect.set(target, prop, value);
+      const listener = obj[afterSetKey];
+      if (listener) {
+        listener(target, prop, value);
+      }
+      return true;
+    },
+    deleteProperty: function (target, prop, value) {
+      Reflect.deleteProperty(target, prop, value);
+      const listener = obj[afterDeleteKey];
+      if (listener) {
+        listener(target, prop, value);
+      }
+      return true;
+    },
+    has(target, key) {
+      if (enhanceKeys.includes(key)) {
+        return false;
+      }
+      return key in target;
+    }
+  });
+
+}
+
 function enhanceArray(array) {
   const afterInsertKey = '$afterInsert';
   const afterUpdateKey = '$afterUpdate';
@@ -69,7 +117,7 @@ function enhanceArray(array) {
 
   return new Proxy(array, {
     deleteProperty: function (target, prop, value) {
-      Reflect.set(target, prop, value);
+      Reflect.deleteProperty(target, prop, value);
       if (!isNaN(prop)) {
         const listener = array[afterDeleteKey];
         if (listener) {
@@ -79,6 +127,11 @@ function enhanceArray(array) {
       return true;
     },
     set: function (target, prop, value) {
+      if (enhanceKeys.includes(key)) {
+        Reflect.set(target, prop, value);
+        return true;
+      }
+
       const isInsert = target[prop] === undefined;
       Reflect.set(target, prop, value);
       if (!isNaN(prop)) {
@@ -219,7 +272,7 @@ function createRecorder() {
     const statusJoining = 'joining';
     const statusJoined = 'joined';
 
-    const textReceiver = enhance({body: null, src: null})
+    const textReceiver = enhance({body: null, src: null});
 
     const protocols = {
       text: {
@@ -245,6 +298,8 @@ function createRecorder() {
       }
     }
 
+    const peers = enhance(new Map());
+
     var room = null;
     const instance = enhance({
       status: statusLeft,
@@ -261,7 +316,8 @@ function createRecorder() {
       isJoining: function () {
         return this.status === statusJoining;
       },
-      textReceiver: textReceiver
+      textReceiver: textReceiver,
+      peers: peers
     });
 
     const callOptions = {
@@ -298,13 +354,7 @@ function createRecorder() {
 
       // Render remote stream for new peer join in the room
       room.on('stream', async stream => {
-        const newVideo = document.createElement('video');
-        newVideo.srcObject = stream;
-        newVideo.playsInline = true;
-        // mark peerId to find it later at peerLeave event
-        newVideo.setAttribute('data-peer-id', stream.peerId);
-        remoteVideos.append(newVideo);
-        await newVideo.play().catch(console.error);
+        peers[stream.peerId] = {stream};
       });
 
       room.on('data', (pack) => {
@@ -313,14 +363,7 @@ function createRecorder() {
 
       // for closing room members
       room.on('peerLeave', peerId => {
-        const remoteVideo = remoteVideos.querySelector(
-          `[data-peer-id=${peerId}]`
-        );
-        remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-        remoteVideo.srcObject = null;
-        remoteVideo.remove();
-
-        appendMessage(`=== ${peerId} が退室しました ===`);
+        delete peers[peerId];
       });
 
       // for closing myself
@@ -401,6 +444,33 @@ function createRecorder() {
       document.body.classList.add("left");
       document.body.classList.remove("joining");
     }
+  }
+
+  room.peers.$afterSet = function(target, prop, value) {
+    console.log('peeer:', prop, value);
+
+    const stream = value.stream;
+
+    const newVideo = document.createElement('video');
+    newVideo.srcObject = stream;
+    newVideo.playsInline = true;
+    // mark peerId to find it later at peerLeave event
+    newVideo.setAttribute('data-peer-id', stream.peerId);
+    remoteVideos.append(newVideo);
+    newVideo.play().catch(console.error);
+  }
+
+  room.peers.$afterDelete = function(target, prop, value) {
+    const peerId = value.stream.peerId;
+
+    const remoteVideo = remoteVideos.querySelector(
+      `[data-peer-id=${peerId}]`
+    );
+    remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+    remoteVideo.srcObject = null;
+    remoteVideo.remove();
+
+    appendMessage(`=== ${peerId} が退室しました ===`);
   }
 
   room.textReceiver.$afterSet.body = function(target, prop, value) {
