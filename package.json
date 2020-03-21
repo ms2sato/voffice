@@ -6,14 +6,10 @@
     "start": "node dev.js"
   },
   "dependencies": {
-    "express": "4.12.x",
-    "cfenv": "1.0.x",
-    "socket.io": "1.0.*",
-    "bluebird": "^2.2.2",
-    "underscore": "^1.6.0"
+    "node-static": "^0.7.11"
   },
   "repository": {},
   "engines": {
-    "node": "5.9.x"
+    "node": "10.17.x"
   }
 }

@@ -1,9 +1,13 @@
-const express = require('express');
-
-const app = express();
-app.use(express.static(__dirname + '/public'));
+const static = require('node-static');
+const http = require('http');
 
 const port = process.env.PORT || 80;
-app.listen(port, '0.0.0.0', () => {
-    console.log("server starting on " + port);
-});
+const file = new(static.Server)(__dirname + '/public');
+
+http.createServer(function (req, res) {
+    req.addListener('end', function () {
+        file.serve(req, res);
+    }).resume();
+}).listen(port);
+
+console.log("server starting on " + port);
