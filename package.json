@@ -1,9 +1,9 @@
 {
-  "name": "socket-hub",
+  "name": "voffice",
   "version": "0.0.1",
-  "description": "websocket-hub",
+  "description": "voffice is online virtual office for telework.",
   "scripts": {
-    "start": "node app.js"
+    "start": "node dev.js"
   },
   "dependencies": {
     "express": "4.12.x",
