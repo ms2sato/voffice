@@ -1,14 +1,12 @@
-const getRoomModeByHash = () => (location.hash === '#sfu' ? 'sfu' : 'mesh');
-
 function createRecorder() {
-  const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-  const SpeechGrammarList = window.webkitSpeechGrammarList || window.SpeechGrammarList;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
 
   if (!SpeechRecognition) {
     return enhance({
       text: '',
       autoRestart: true,
-      enabled: true,
+      enabled: false,
       start: function () {},
       stop: function () {},
       canAutoRestart: function () {
@@ -22,7 +20,7 @@ function createRecorder() {
   const instance = enhance({
     text: '',
     autoRestart: true,
-    enabled: false,
+    enabled: true,
     start: function () {
       console.log('recorder start');
       speech.start();
@@ -294,7 +292,7 @@ async function createRoom(peer) {
 
       remove() {
         const remoteVideoPanel = document.querySelector(
-          `[data-peer-id="${this.peer.stream.id}"]`
+          `[data-peer-id="${this.peer.stream.peerId}"]`
         );
 
         const remoteVideo = remoteVideoPanel.getElementsByTagName('video')[0];
@@ -350,10 +348,7 @@ async function createRoom(peer) {
     return callPanels.querySelector('.call-panel:last-child');
   }
 
-  const meta = document.getElementById('js-meta');
-  const sdkSrc = document.querySelector('script[src*=skyway]');
   const messages = document.getElementById('js-messages');
-  const roomMode = document.getElementById('js-room-mode');
   const joinTrigger = document.getElementById('js-join-trigger');
   const leaveTrigger = document.getElementById('js-leave-trigger');
   const remoteVideos = document.getElementById('js-remote-streams');
@@ -364,6 +359,9 @@ async function createRoom(peer) {
 
   function appendMessage(text) {
     messages.textContent += `${text}\n`;
+    setTimeout(function(){
+      window.scrollTo(0,document.body.scrollHeight);
+    }, 100);
   }
 
   const constraints = {
@@ -395,17 +393,6 @@ async function createRoom(peer) {
   localVideo.playsInline = true;
   await localVideo.play().catch(console.error);
 
-  meta.innerText = `
-    UA: ${navigator.userAgent}
-    SDK: ${sdkSrc ? sdkSrc.src : 'unknown'}
-  `.trim();
-
-  roomMode.textContent = getRoomModeByHash();
-  window.addEventListener(
-    'hashchange',
-    () => (roomMode.textContent = getRoomModeByHash())
-  );
-
   const Peer = window.Peer;
 
   // eslint-disable-next-line require-atomic-updates
@@ -427,13 +414,21 @@ async function createRoom(peer) {
       return;
     }
 
-    room.join(roomId.value, localStream, getRoomModeByHash());
+    room.join(roomId.value, localStream, 'mesh');
   });
 
   sendTrigger.addEventListener('click', () => {
     room.sendMessage(localText.value);
     room.localText = localText.value;
     localText.value = '';
+    localText.setAttribute("rows", 1);
+  });
+
+  localText.addEventListener('keydown', function () {
+    if (event.keyCode == 13) {
+        const rows = parseInt(this.getAttribute("rows"));
+        if(rows < 10) { this.setAttribute("rows", rows + 1); }
+    }
   });
 
   leaveTrigger.addEventListener('click', () => room.close());
@@ -471,7 +466,7 @@ async function createRoom(peer) {
 
   room.peers.$afterSet = function (target, prop, value) {
     const stream = value.stream;
-    appendMessage(`=== ${stream.peerId} が入室しました ===`);
+    appendMessage(`=== ${stream.peerId} が接続しました ===`);
     videoPanels.append(value);
   }
 
