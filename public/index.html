@@ -50,22 +50,7 @@
   </head>
   <body class="left">
     <div class="messages-container">
-      <pre class="messages" id="js-messages">
-ああああああ
-ああああああ
-ああああああ
-ああああああ
-ああああああ
-ああああああ
-いいい
-いいい
-いいい
-いいい
-いいい
-いいい
-いいい
-いいい
-</pre>
+      <pre class="messages" id="js-messages"></pre>
     </div>
     <div class="container">
       <header>
@@ -79,18 +64,21 @@
           <div class="remote-streams" id="js-remote-streams">
             <div class="video-container local-video">
               <video id="js-local-stream" autoplay muted playsinline></video>
+              <canvas id="js-local-canvas" width="240" height="180"></canvas>
             </div>
           </div>
         </div>
       </div>
       <div class="sender">
-        <textarea id="js-local-text" rows="1"></textarea>
-        <button id="js-send-trigger">Send</button>
+        <div class="local-text-wrapper">
+          <textarea id="js-local-text" rows="1"></textarea>
+        </div>
+        <button id="js-send-trigger">送信</button>
       </div>
     </div>
 
     <script type="text/template" id="callPanelTemplate">
-      <div class="call-panel video-container">
+      <div class="remote-panel video-container">
         <h3 class="heading">
           <span class="peer-id"></span>
           <a class="near-to" href="javascript:void(0)">そばに寄る</a>
@@ -98,6 +86,7 @@
           <a class="far-from" href="javascript:void(0)">離れる</a>
         </h3>
         <video class="js-remote-stream"></video>
+        <img class="js-remote-canvas"/>
       </div>
     </script>
 
@@ -106,6 +95,7 @@
       const key = "05c8897d-1abc-4cf7-a4b7-528cbb522892";
       window.__SKYWAY_KEY__ = key;
     </script>
+    <script src="./imageFilters.js"></script>
     <script src="./enhance.js"></script>
     <script src="./connection.js"></script>
   </body>

@@ -101,7 +101,13 @@ async function createRoom(peer) {
       console.log(`peerId2Distance: ${peerId2Distance}`);
       return peerId2Distance;
     }
-  })
+  });
+
+  const _faceReceiver = enhance({
+    image: "",
+    src: null,
+
+  });
 
   const _protocols = {
     text: {
@@ -129,7 +135,7 @@ async function createRoom(peer) {
           matrix: matrix
         });
       },
-      sendPair: function(lhPeerId, rhPeerId, distance) {
+      sendPair: function (lhPeerId, rhPeerId, distance) {
         const matrix = {};
         const subMatrix = {};
         subMatrix[rhPeerId] = distance;
@@ -149,9 +155,29 @@ async function createRoom(peer) {
         const peerId2Distance = _distanceReceiver.normalizedDistances();
         for (var peerId in peerId2Distance) {
           const peer = _peers[peerId];
-          if(peer == undefined) { continue; }
+          if (peer == undefined) {
+            continue;
+          }
           peer.distance = peerId2Distance[peerId]
         }
+      }
+    },
+    face: {
+      send: function(dataUrl) {
+        _room.send({
+          type: 'face',
+          image: dataUrl
+        })
+      },
+      receive: function({
+        data,
+        src
+      }){
+        if (data.type != 'face') {
+          throw `Illegal type expect: face, got: ${data.type}`
+        }
+        const peer = _peers[src];
+        peer.face = data.image;
       }
     },
     dispatch: function (pack) {
@@ -165,15 +191,17 @@ async function createRoom(peer) {
   }
 
   const _peers = enhance.asMap({});
+
   function createPeer(stream) {
     return enhance({
       stream: stream,
       distance: farDistance,
-      nearTo: function() {
+      face: "",
+      nearTo: function () {
         this.distance = nearDistance;
         _protocols.distance.sendPair(peer.id, this.stream.peerId, this.distance);
       },
-      farFrom: function() {
+      farFrom: function () {
         this.distance = farDistance;
         _protocols.distance.sendPair(peer.id, this.stream.peerId, this.distance);
       }
@@ -242,13 +270,16 @@ async function createRoom(peer) {
     sendMessage: function (text) {
       _protocols.text.send(text)
     },
-    moveTo: function(peerId, distance) {
+    sendFace: function(dataUrl) {
+      _protocols.face.send(dataUrl);
+    },
+    moveTo: function (peerId, distance) {
       _peers[peerId].distance = distance;
     },
     nearTo: function (peerId) {
       _peers[peerId].nearTo();
     },
-    farFrom: function(peerId) {
+    farFrom: function (peerId) {
       _peers[peerId].farFrom();
     }
   });
@@ -288,15 +319,20 @@ async function createRoom(peer) {
         distancePanel.innerText = peer.distance;
 
         const _this = this;
-        peer.$afterSet.distance = function(peer, prop, distance) {
+        peer.$afterSet.distance = function (peer, prop, distance) {
           _this.setVolumeFromDistance(distance);
           distancePanel.innerText = distance
 
-          if(distance == room.nearDistance) {
+          if (distance == room.nearDistance) {
             appendMessage(`=== ${peerId} と近づきました ===`);
-          }else if(distance == room.farDistance) {
+          } else if (distance == room.farDistance) {
             appendMessage(`=== ${peerId} と離れました ===`);
           }
+        }
+
+        peer.$afterSet.face = function(peer, prop, face) {
+          const img = panel.getElementsByTagName('img')[0];
+          img.src = face;
         }
       }
 
@@ -340,7 +376,9 @@ async function createRoom(peer) {
         videoPanels[peer.stream.peerId] = videoPanel;
       },
       remove: function (peerId) {
-        if(videoPanels[peerId] === undefined) { return; }
+        if (videoPanels[peerId] === undefined) {
+          return;
+        }
 
         videoPanels[peerId].remove();
         delete videoPanels[peerId];
@@ -368,7 +406,7 @@ async function createRoom(peer) {
   function appendTo() {
     const callPanels = remoteVideos;
     callPanels.insertAdjacentHTML('beforeend', callPanelTemplate);
-    return callPanels.querySelector('.call-panel:last-child');
+    return callPanels.querySelector('.remote-panel:last-child');
   }
 
   const messages = document.getElementById('js-messages');
@@ -379,19 +417,23 @@ async function createRoom(peer) {
   const localText = document.getElementById('js-local-text');
   const sendTrigger = document.getElementById('js-send-trigger');
   const localVideo = document.getElementById('js-local-stream');
+  const localCanvas = document.getElementById('js-local-canvas');
+
+  const localCanvasWidth = localCanvas.getAttribute('width');
+  const localCanvasHeight = localCanvas.getAttribute('height');
 
   function appendMessage(text) {
     messages.textContent += `${text}\n`;
-    setTimeout(function(){
-      window.scrollTo(0,document.body.scrollHeight);
+    setTimeout(function () {
+      window.scrollTo(0, document.body.scrollHeight);
     }, 100);
   }
 
   const constraints = {
     audio: true,
     video: {
-      width: 280,
-      height: 220,
+      width: localCanvas.getAttribute('width'),
+      height: localCanvas.getAttribute('height'),
       facingMode: "user"
     }
   };
@@ -409,12 +451,25 @@ async function createRoom(peer) {
   const localStream = await mediaDevices
     .getUserMedia(constraints)
     .catch(console.error);
+  const localSoundStream = await mediaDevices.getUserMedia({audio: true}).catch(console.error);
 
   // Render local stream
   localVideo.muted = true;
   localVideo.srcObject = localStream;
   localVideo.playsInline = true;
   await localVideo.play().catch(console.error);
+
+  function drawFace() {
+    const context = localCanvas.getContext("2d");
+    context.drawImage(localVideo, 0, 0, localCanvasWidth, localCanvasHeight);
+    const imageData = context.getImageData(0, 0, localCanvasWidth, localCanvasHeight);
+    const filtered = ImageFilters.BoxBlur(imageData, 3, 3, 4);
+    context.putImageData(filtered, 0, 0);
+
+    if(room.isJoined()) {
+      room.sendFace(localCanvas.toDataURL('image/jpeg', 0.5));
+     }
+  }
 
   const Peer = window.Peer;
 
@@ -428,6 +483,11 @@ async function createRoom(peer) {
 
   const recorder = createRecorder();
   const room = await createRoom(peer);
+  drawFace();
+  setInterval(function () {
+    drawFace();
+  }, 3000);
+
   const videoPanels = createVideoPanels(room);
 
   // Register join handler
@@ -437,20 +497,35 @@ async function createRoom(peer) {
       return;
     }
 
-    room.join(roomId.value, localStream, 'mesh');
+    room.join(roomId.value, localSoundStream, 'mesh');
   });
 
-  sendTrigger.addEventListener('click', () => {
+
+  function sendLocalTextMessage() {
+    if(localText.value.match(/^\s*$/)) { return; }
+
     room.sendMessage(localText.value);
     room.localText = localText.value;
     localText.value = '';
     localText.setAttribute("rows", 1);
+  }
+
+  sendTrigger.addEventListener('click', () => {
+    sendLocalTextMessage();
   });
 
   localText.addEventListener('keydown', function () {
-    if (event.keyCode == 13) {
+    if (event.key === "Enter") {
+      if(event.isComposing) { return; }
+
+      if(event.shiftKey) {
         const rows = parseInt(this.getAttribute("rows"));
-        if(rows < 10) { this.setAttribute("rows", rows + 1); }
+        if (rows < 10) {
+          this.setAttribute("rows", rows + 1);
+        }
+      } else {
+        sendLocalTextMessage();
+      }
     }
   });
 

@@ -32,12 +32,34 @@ body>.container {
 
 }
 
+.local-video video{
+  display: none;
+}
+
+.remote-panel video {
+  display: none;
+}
+
 .sender {
   position: fixed;
   left: 240px;
-  bottom: 0;
+  right: 0;
+  bottom: 20px;
   margin: 0 auto;
-  max-width: 980px;
+}
+
+.sender .local-text-wrapper {
+  margin-right: 55px;
+}
+
+.sender textarea {
+  width: 100%;
+}
+
+.sender button {
+  position: absolute;
+  right: 10px;
+  top: 0;
 }
 
 /* room */
@@ -63,7 +85,7 @@ body>.container {
 .messages-container {
   position: absolute;
   top: 0;
-  bottom: 1em;
+  bottom: 50px;
   right: 0;
   left: 240px;
 }
