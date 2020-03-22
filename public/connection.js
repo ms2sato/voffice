@@ -260,7 +260,7 @@ async function createRoom(peer) {
         video.srcObject = stream;
         video.playsInline = true;
         remoteVideos.append(panel);
-        this.setVolume(peer.distance);
+        this.setVolumeFromDistance(peer.distance);
         video.play().catch(console.error);
 
         panel.getElementsByClassName('peer-id')[0].innerText = peerId;
@@ -276,9 +276,13 @@ async function createRoom(peer) {
 
         const _this = this;
         peer.$afterSet.distance = function(target, prop, value) {
-          _this.setVolume(1 - value);
+          _this.setVolumeFromDistance(value);
           distancePanel.innerText = value
         }
+      }
+
+      setVolumeFromDistance(distance) {
+        this.setVolume(1 - distance);
       }
 
       setVolume(value) {
@@ -471,9 +475,9 @@ async function createRoom(peer) {
   }
 
   room.peers.$afterDelete = function (target, prop, value) {
-    const peerId = value.peerId;
+    const peerId = prop;
     videoPanels.remove(peerId);
-    appendMessage(`=== ${peerId} が退室しました ===`);
+    appendMessage(`=== ${peerId} が切断しました ===`);
   }
 
   room.textReceiver.$afterSet.body = function (target, prop, value) {

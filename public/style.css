@@ -4,7 +4,9 @@ body { margin: 0; position: relative;}
 header {
   position: fixed;
   left: 0;
-  bottom: 0;
+  bottom: 1em;
+  padding-left: 10px;
+  padding-bottom: 8px;
 }
 
 /* global styles */
