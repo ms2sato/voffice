@@ -67,6 +67,9 @@ async function createRoom(peer) {
   const statusJoining = 'joining';
   const statusJoined = 'joined';
 
+  const nearDistance = 0;
+  const farDistance = 0.8;
+
   const callOptions = {
     videoBandwidth: 1
   };
@@ -126,6 +129,13 @@ async function createRoom(peer) {
           matrix: matrix
         });
       },
+      sendPair: function(lhPeerId, rhPeerId, distance) {
+        const matrix = {};
+        const subMatrix = {};
+        subMatrix[rhPeerId] = distance;
+        matrix[lhPeerId] = subMatrix;
+        this.send(matrix);
+      },
       receive: function ({
         data,
         src
@@ -155,10 +165,18 @@ async function createRoom(peer) {
   }
 
   const _peers = enhance.asMap({});
-  function newPeer(stream) {
-    _peers[stream.peerId] = enhance({
+  function createPeer(stream) {
+    return enhance({
       stream: stream,
-      distance: 0.8
+      distance: farDistance,
+      nearTo: function() {
+        this.distance = nearDistance;
+        _protocols.distance.sendPair(peer.id, this.stream.peerId, this.distance);
+      },
+      farFrom: function() {
+        this.distance = farDistance;
+        _protocols.distance.sendPair(peer.id, this.stream.peerId, this.distance);
+      }
     });
   }
 
@@ -185,7 +203,7 @@ async function createRoom(peer) {
     });
 
     _room.on('stream', async stream => {
-      newPeer(stream)
+      _peers[stream.peerId] = createPeer(stream);
     });
 
     _room.on('data', (pack) => {
@@ -204,6 +222,8 @@ async function createRoom(peer) {
 
   var _room = null;
   const instance = enhance({
+    nearDistance: nearDistance,
+    farDistance: farDistance,
     status: statusLeft,
     localText: '',
     textReceiver: _textReceiver,
@@ -224,19 +244,12 @@ async function createRoom(peer) {
     },
     moveTo: function(peerId, distance) {
       _peers[peerId].distance = distance;
-
-      const matrix = {};
-      const subMatrix = {};
-      subMatrix[peerId] = distance;
-      matrix[peer.id] = subMatrix;
-
-      _protocols.distance.send(matrix);
     },
     nearTo: function (peerId) {
-      this.moveTo(peerId, 0);
+      _peers[peerId].nearTo();
     },
     farFrom: function(peerId) {
-      this.moveTo(peerId, 0.8);
+      _peers[peerId].farFrom();
     }
   });
 
@@ -275,9 +288,15 @@ async function createRoom(peer) {
         distancePanel.innerText = peer.distance;
 
         const _this = this;
-        peer.$afterSet.distance = function(target, prop, value) {
-          _this.setVolumeFromDistance(value);
-          distancePanel.innerText = value
+        peer.$afterSet.distance = function(peer, prop, distance) {
+          _this.setVolumeFromDistance(distance);
+          distancePanel.innerText = distance
+
+          if(distance == room.nearDistance) {
+            appendMessage(`=== ${peerId} と近づきました ===`);
+          }else if(distance == room.farDistance) {
+            appendMessage(`=== ${peerId} と離れました ===`);
+          }
         }
       }
 
@@ -468,10 +487,9 @@ async function createRoom(peer) {
     }
   }
 
-  room.peers.$afterSet = function (target, prop, value) {
-    const stream = value.stream;
-    appendMessage(`=== ${stream.peerId} が接続しました ===`);
-    videoPanels.append(value);
+  room.peers.$afterSet = function (pears, peerId, peer) {
+    appendMessage(`=== ${peerId} が接続しました ===`);
+    videoPanels.append(peer);
   }
 
   room.peers.$afterDelete = function (target, prop, value) {
