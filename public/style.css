@@ -36,10 +36,6 @@ body>.container {
   display: none;
 }
 
-.remote-panel video {
-  display: none;
-}
-
 .sender {
   position: fixed;
   left: 240px;
@@ -69,6 +65,7 @@ body>.container {
 
 .room .video-container {
   float: left;
+  background-color: black;
 }
 
 .room .streams-container {
@@ -81,6 +78,51 @@ body>.container {
 .room .remote-streams {
   background-color: #f6fbff;
 }
+
+.room .remote-panel {
+  position: relative;
+}
+
+.room .remote-panel .peer-id {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2px 4px;
+  text-align: right;
+  font-size: 80%;
+  background-color: rgba(0,0,0, 0.2);
+  color: white;
+}
+
+.room .remote-panel .heading {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  padding: 2px 4px;
+  font-size: 80%;
+  background-color: rgba(0,0,0, 0.2);
+  color: white;
+}
+
+.room .remote-panel video {
+  display: none;
+}
+
+.room .remote-panel .heading a{
+  color: lightgreen;
+}
+
+.room .remote-panel.near .near-to {
+  display: none;
+}
+
+.room .remote-panel.far .far-from {
+  display: none;
+}
+
+
 
 .messages-container {
   position: absolute;

@@ -324,14 +324,18 @@ async function createRoom(peer) {
           distancePanel.innerText = distance
 
           if (distance == room.nearDistance) {
+            panel.classList.add("near");
+            panel.classList.remove("far");
             appendMessage(`=== ${peerId} と近づきました ===`);
           } else if (distance == room.farDistance) {
+            panel.classList.add("far");
+            panel.classList.remove("near");
             appendMessage(`=== ${peerId} と離れました ===`);
           }
         }
 
         peer.$afterSet.face = function(peer, prop, face) {
-          const img = panel.getElementsByTagName('img')[0];
+          const img = panel.getElementsByClassName('js-remote-canvas')[0];
           img.src = face;
         }
       }
