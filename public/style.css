@@ -170,3 +170,7 @@ body.joining .leave-trigger {
   pointer-events: none;
   opacity: 0.5;
 }
+
+body.left .sender {
+  display: none;
+}
