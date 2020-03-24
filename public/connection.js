@@ -103,12 +103,6 @@ async function createRoom(peer) {
     }
   });
 
-  const _faceReceiver = enhance({
-    image: "",
-    src: null,
-
-  });
-
   const _protocols = {
     text: {
       send: function (text) {
@@ -177,7 +171,7 @@ async function createRoom(peer) {
           throw `Illegal type expect: face, got: ${data.type}`
         }
         const peer = _peers[src];
-        peer.face = data.image;
+        if(peer) { peer.face = data.image; }
       }
     },
     dispatch: function (pack) {
@@ -286,6 +280,79 @@ async function createRoom(peer) {
 
   return instance;
 }
+
+function voiceFilter(stream) {
+  // return new MediaStream(stream.getAudioTracks());
+
+
+  let context = new (window.AudioContext || window.webkitAudioContext)();
+  let mic = context.createMediaStreamSource(stream);
+  let output = context.createMediaStreamDestination();
+
+  // Create the instance of BiquadFilterNode
+  let sbass = context.createBiquadFilter();
+  let bass = context.createBiquadFilter();
+  let middle1 = context.createBiquadFilter();
+  let middle2 = context.createBiquadFilter();
+  let treble1 = context.createBiquadFilter();
+  let treble2 = context.createBiquadFilter();
+  let treble3 = context.createBiquadFilter();
+  let lowpass = context.createBiquadFilter();
+  let highpass = context.createBiquadFilter();
+
+  // Set type
+  sbass.type = (typeof bass.type === 'string') ? 'lowshelf' : 3;
+  bass.type = (typeof bass.type === 'string') ? 'lowshelf' : 3;
+  middle1.type = (typeof middle1.type === 'string') ? 'peaking' : 5;
+  middle2.type = (typeof middle2.type === 'string') ? 'peaking' : 5;
+  treble1.type = (typeof treble1.type === 'string') ? 'highshelf' : 4;
+  treble2.type = (typeof treble2.type === 'string') ? 'highshelf' : 4;
+  treble3.type = (typeof treble3.type === 'string') ? 'highshelf' : 4;
+  lowpass.type = (typeof lowpass.type === 'string') ? 'lowpass' : 0;
+  highpass.type = (typeof highpass.type === 'string') ? 'highpass' : 1;
+
+  // Set frequency
+  lowpass.frequency.value = 8000;
+  highpass.frequency.value = 100;
+  sbass.frequency.value = 0.1;
+  bass.frequency.value = 200;
+  middle1.frequency.value = 600;
+  middle2.frequency.value = 1000;
+  treble1.frequency.value = 1800;
+  treble2.frequency.value = 4000;
+  treble3.frequency.value = 6000;
+
+  // Set Q (Quality Factor)
+  // bass.Q.value   = Math.SQRT1_2;  // Not used
+  middle1.Q.value = Math.SQRT1_2;
+  middle2.Q.value = Math.SQRT1_2;
+  // treble.Q.value = Math.SQRT1_2;  // Not used
+  lowpass.Q.value = 0.2;
+  highpass.Q.value = 0.7;
+
+  // Initialize Gain
+  sbass.gain.value = -1;
+  bass.gain.value = 1;
+  middle1.gain.value = 3;
+  middle2.gain.value = 2;
+  treble1.gain.value = 1;
+  treble2.gain.value = 0;
+  treble3.gain.value = -2;
+
+  mic.connect(lowpass);
+  lowpass.connect(highpass);
+  highpass.connect(sbass);
+  sbass.connect(bass);
+  bass.connect(middle1);
+  middle1.connect(middle2);
+  middle2.connect(treble1);
+  treble1.connect(treble2);
+  treble2.connect(treble3);
+  treble3.connect(output);
+
+  return output.stream;
+}
+
 
 (async function main() {
   function createVideoPanels(room) {
@@ -433,14 +500,22 @@ async function createRoom(peer) {
     }, 100);
   }
 
+  // @see https://qiita.com/nyarisuke/items/980e4996d491f51ad241
   const constraints = {
     audio: true,
+    sampleRate: {ideal: 48000},
+    sampleSize: {ideal: 16},
+    echoCancellation: true,
+    echoCancellationType: 'system',
+    noiseSuppression: false,
+    latency: 0.01,
     video: {
       width: localCanvas.getAttribute('width'),
       height: localCanvas.getAttribute('height'),
       facingMode: "user"
     }
   };
+
 
   const mediaDevices = navigator.mediaDevices ||
     navigator.webkitGetUserMedia ||
@@ -455,11 +530,12 @@ async function createRoom(peer) {
   const localStream = await mediaDevices
     .getUserMedia(constraints)
     .catch(console.error);
-  const localSoundStream = await mediaDevices.getUserMedia({audio: true}).catch(console.error);
+  const localVideoStream = new MediaStream(localStream.getVideoTracks());
+  const localSoundStream = voiceFilter(localStream);
 
   // Render local stream
   localVideo.muted = true;
-  localVideo.srcObject = localStream;
+  localVideo.srcObject = localVideoStream;
   localVideo.playsInline = true;
   await localVideo.play().catch(console.error);
 
