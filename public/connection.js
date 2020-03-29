@@ -62,7 +62,7 @@ function createRecorder() {
   return instance;
 }
 
-async function createRoom(peer) {
+function createRoom(peer) {
   const statusLeft = 'left';
   const statusJoining = 'joining';
   const statusJoined = 'joined';
@@ -354,7 +354,7 @@ function voiceFilter(stream) {
   return output.stream;
 }
 
-async function createMedia(width, height) {
+function createMedia(width, height) {
   const statuses = {stop: 'stop', booting: 'booting', online: 'online'};
 
   const audioConstraints = {
@@ -387,21 +387,6 @@ async function createMedia(width, height) {
     return;
   }
 
-  let status = statuses.booting;
-  const [videoStream, audioStream] = await Promise.all([
-    mediaDevices.getUserMedia({
-      audio: false,
-      video: videoConstraints
-    }),
-    mediaDevices.getUserMedia({
-      audio: audioConstraints,
-      video: false
-    })
-  ]).catch(console.error)
-  status = status.online;
-
-  const filteredAudioStream = voiceFilter(audioStream);
-
   function drawFace() {
     if(!instance.videoStream) { return; }
 
@@ -423,9 +408,30 @@ async function createMedia(width, height) {
 
   const instance = enhance({
     statuses: statuses,
-    videoStatus: status,
-    audioStream: filteredAudioStream,
-    videoStream: videoStream,
+    videoStatus: statuses.stop,
+    audioStream: null,
+    videoStream: null,
+    initialize: async function() {
+      if (this.audioStream || this.videoStream) { throw 'already initialized'; }
+
+      this.videoStatus = statuses.booting;
+      const [videoStream, audioStream] = await Promise.all([
+        mediaDevices.getUserMedia({
+          audio: false,
+          video: videoConstraints
+        }),
+        mediaDevices.getUserMedia({
+          audio: audioConstraints,
+          video: false
+        })
+      ]).catch(console.error)
+
+      this.videoStatus = statuses.online;
+      this.videoStream = videoStream;
+      this.audioStream = voiceFilter(audioStream);
+
+      this.startDrawFace();
+    },
     startDrawFace: function(){ drawFace(); },
     handleDrawFace: function(_tempVideo) { /* nop */ },
     enableVideo: function(value) {
@@ -598,7 +604,6 @@ async function createMedia(width, height) {
   const context = localCanvas.getContext("2d");
   context.filter = "blur(2px)";
 
-
   function appendMessage(text) {
     messages.textContent += `${text}\n`;
     setTimeout(function () {
@@ -614,9 +619,9 @@ async function createMedia(width, height) {
 
   peer.on('error', console.error);
 
-  const media = await createMedia(localCanvasWidth, localCanvasHeight);
+  const media = createMedia(localCanvasWidth, localCanvasHeight);
   const recorder = createRecorder();
-  const room = await createRoom(peer);
+  const room = createRoom(peer);
   const videoPanels = createVideoPanels(room);
 
   media.handleDrawFace = function(tempVideo) {
@@ -626,8 +631,6 @@ async function createMedia(width, height) {
       room.sendFace(localCanvas.toDataURL('image/jpeg', 0.3));
     }
   }
-
-  media.startDrawFace();
 
   joinTrigger.addEventListener('click', () => {
     if (roomId.value === "") {
@@ -742,6 +745,8 @@ async function createMedia(width, height) {
       room.close();
     }
   }
+
+  media.initialize();
 
   const urlParams = new URLSearchParams(window.location.search);
   const roomKey = urlParams.get('room');

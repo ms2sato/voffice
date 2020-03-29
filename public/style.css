@@ -66,9 +66,13 @@ body>.container {
   color: white;
 }
 
-.room .video-container .controls{
+.room .video-container.local-video .controls{
   text-align: right;
   padding: 2px 4px;
+}
+
+.room .video-container.local-video canvas{
+  display: block;
 }
 
 .room .streams-container {
@@ -110,6 +114,7 @@ body>.container {
 }
 
 .room .remote-panel img {
+  display: block;
   width: 180px;
   height: 135px;
 }
