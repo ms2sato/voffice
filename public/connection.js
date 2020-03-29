@@ -366,7 +366,7 @@ function voiceFilter(stream) {
         const panel = appendTo()
         panel.setAttribute('data-peer-id', peerId);
 
-        const video = panel.getElementsByTagName('video')[0];
+        const video = panel.getElementsByClassName('js-remote-stream')[0];
         this.video = video;
         video.srcObject = stream;
         video.playsInline = true;
@@ -425,7 +425,7 @@ function voiceFilter(stream) {
           `[data-peer-id="${this.peer.stream.peerId}"]`
         );
 
-        const remoteVideo = remoteVideoPanel.getElementsByTagName('video')[0];
+        const remoteVideo = remoteVideoPanel.getElementsByClassName('js-remote-stream')[0];
         remoteVideo.srcObject.getTracks().forEach(track => track.stop());
         remoteVideo.srcObject = null;
         remoteVideoPanel.remove();
@@ -584,7 +584,7 @@ function voiceFilter(stream) {
       return;
     }
 
-    room.join(roomId.value, localSoundStream, 'mesh');
+    room.join(roomId.value, localSoundStream, 'sfu');
   });
 
   function sendLocalTextMessage() {

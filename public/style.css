@@ -103,8 +103,9 @@ body>.container {
   color: white;
 }
 
-.room .remote-panel video {
-  display: none;
+.room .remote-panel img {
+  width: 180px;
+  height: 135px;
 }
 
 .room .remote-panel .heading a{
