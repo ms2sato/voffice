@@ -444,7 +444,8 @@
         drawFace();
       },
       handleDrawFace: function (_tempVideo) {
-        /* nop */ },
+        /* nop */
+      },
       enableVideo: function (value) {
         const _this = this;
         if (this.enabledVideo == value) {
