@@ -157,25 +157,26 @@ async function createRoom(peer) {
       }
     },
     face: {
-      send: function(dataUrl) {
+      send: function (dataUrl) {
         _room.send({
           type: 'face',
           image: dataUrl
         })
       },
-      receive: function({
+      receive: function ({
         data,
         src
-      }){
+      }) {
         if (data.type != 'face') {
           throw `Illegal type expect: face, got: ${data.type}`
         }
         const peer = _peers[src];
-        if(peer) { peer.face = data.image; }
+        if (peer) {
+          peer.face = data.image;
+        }
       }
     },
     dispatch: function (pack) {
-      console.log(pack);
       const protocolType = this[pack.data.type];
       if (protocolType === undefined) {
         throw `Illegal protocol type: ${pack.data.type}`
@@ -264,7 +265,7 @@ async function createRoom(peer) {
     sendMessage: function (text) {
       _protocols.text.send(text)
     },
-    sendFace: function(dataUrl) {
+    sendFace: function (dataUrl) {
       _protocols.face.send(dataUrl);
     },
     moveTo: function (peerId, distance) {
@@ -285,7 +286,7 @@ function voiceFilter(stream) {
   // return new MediaStream(stream.getAudioTracks());
 
 
-  let context = new (window.AudioContext || window.webkitAudioContext)();
+  let context = new(window.AudioContext || window.webkitAudioContext)();
   let mic = context.createMediaStreamSource(stream);
   let output = context.createMediaStreamDestination();
 
@@ -353,6 +354,107 @@ function voiceFilter(stream) {
   return output.stream;
 }
 
+async function createMedia(width, height) {
+  const statuses = {stop: 'stop', booting: 'booting', online: 'online'};
+
+  const audioConstraints = {
+    sampleRate: {
+      ideal: 32000
+    },
+    sampleSize: {
+      ideal: 16
+    },
+    echoCancellation: true,
+    echoCancellationType: 'system',
+    noiseSuppression: false,
+    latency: 1,
+  };
+
+  const videoConstraints = {
+    width: width,
+    height: height,
+    frameRate: 0.05,
+    facingMode: "user"
+  };
+
+  const mediaDevices = navigator.mediaDevices ||
+    navigator.webkitGetUserMedia ||
+    navigator.mozGetUserMedia ||
+    navigator.msGetUserMedia;
+
+  if (!mediaDevices) {
+    alert('このデバイスではご利用できません。ブラウザが古いか、モバイルの場合にはHTTPSで無いと動作しない可能性が高いです。');
+    return;
+  }
+
+  let status = statuses.booting;
+  const [videoStream, audioStream] = await Promise.all([
+    mediaDevices.getUserMedia({
+      audio: false,
+      video: videoConstraints
+    }),
+    mediaDevices.getUserMedia({
+      audio: audioConstraints,
+      video: false
+    })
+  ]).catch(console.error)
+  status = status.online;
+
+  const filteredAudioStream = voiceFilter(audioStream);
+
+  function drawFace() {
+    if(!instance.videoStream) { return; }
+
+    let localVideo = document.createElement('video');
+    localVideo.muted = true;
+    localVideo.playsInline = true;
+    localVideo.srcObject = instance.videoStream;
+    localVideo.play().then(function () {
+
+      instance.handleDrawFace(localVideo);
+      localVideo.pause();
+      localVideo.srcObject = null;
+      localVideo.remove();
+      localVideo = null;
+
+      setTimeout(drawFace, 3000);
+    }).catch(console.error);
+  }
+
+  const instance = enhance({
+    statuses: statuses,
+    videoStatus: status,
+    audioStream: filteredAudioStream,
+    videoStream: videoStream,
+    startDrawFace: function(){ drawFace(); },
+    handleDrawFace: function(_tempVideo) { /* nop */ },
+    enableVideo: function(value) {
+      const _this = this;
+      if(this.enabledVideo == value) { return; }
+
+      if(value){
+        this.videoStatus = statuses.booting;
+        mediaDevices.getUserMedia({
+          audio: false,
+          video: videoConstraints
+        }).then(function(videoStream) {
+          _this.videoStream = videoStream;
+          _this.videoStatus = statuses.online;
+          _this.startDrawFace();
+        }).catch(console.error);
+      } else {
+        this.videoStream.getTracks().forEach(function(track) {
+          track.stop();
+        });
+        this.videoStatus = statuses.stop;
+        this.videoStream = null;
+      }
+    }
+  });
+
+  return instance;
+}
+
 
 (async function main() {
   function createVideoPanels(room) {
@@ -401,7 +503,7 @@ function voiceFilter(stream) {
           }
         }
 
-        peer.$afterSet.face = function(peer, prop, face) {
+        peer.$afterSet.face = function (peer, prop, face) {
           const img = panel.getElementsByClassName('js-remote-canvas')[0];
           img.src = face;
         }
@@ -487,6 +589,7 @@ function voiceFilter(stream) {
   const roomId = document.getElementById('js-room-id');
   const localText = document.getElementById('js-local-text');
   const sendTrigger = document.getElementById('js-send-trigger');
+  const saveModeCheck = document.getElementById('js-save-mode');
   const localCanvas = document.getElementById('js-local-canvas');
 
   const localCanvasWidth = localCanvas.getAttribute('width');
@@ -503,69 +606,7 @@ function voiceFilter(stream) {
     }, 100);
   }
 
-  // @see https://qiita.com/nyarisuke/items/980e4996d491f51ad241
-  const constraints = {
-    audio: {
-      sampleRate: {ideal: 48000},
-      sampleSize: {ideal: 16},
-      echoCancellation: true,
-      echoCancellationType: 'system',
-      noiseSuppression: false,
-      latency: 1,
-    },
-    video: {
-      width: { max: localCanvas.getAttribute('width') },
-      height: localCanvas.getAttribute('height'),
-      frameRate: 0.05,
-      facingMode: "user"
-    }
-  };
-
-  const mediaDevices = navigator.mediaDevices ||
-    navigator.webkitGetUserMedia ||
-    navigator.mozGetUserMedia ||
-    navigator.msGetUserMedia;
-
-  if (!mediaDevices) {
-    alert('このデバイスではご利用できません。ブラウザが古いか、モバイルの場合にはHTTPSで無いと動作しない可能性が高いです。');
-    return;
-  }
-
-  const localStream = await mediaDevices
-    .getUserMedia(constraints)
-    .catch(console.error)
-
-  const localVideoStream = new MediaStream(localStream.getVideoTracks());
-  const localSoundStream = voiceFilter(localStream);
-
-  function drawFace() {
-    let localVideo = document.createElement('video');
-    localVideo.muted = true;
-    localVideo.playsInline = true;
-    localVideo.srcObject = localVideoStream;
-    localVideo.play().then(function() {
-      context.drawImage(localVideo, 0, 0, localCanvasWidth, localCanvasHeight);
-
-      if(room.isJoined()) {
-        room.sendFace(localCanvas.toDataURL('image/jpeg', 0.3));
-      }
-
-      localVideo.pause();
-      localVideo.srcObject = null;
-      localVideo.remove();
-      localVideo = null;
-
-      setTimeout(function () {
-        drawFace();
-      }, 3000);
-
-    }).catch(console.error);
-  }
-  drawFace();
-
   const Peer = window.Peer;
-
-  // eslint-disable-next-line require-atomic-updates
   const peer = (window.peer = new Peer({
     key: window.__SKYWAY_KEY__,
     debug: 3,
@@ -573,22 +614,34 @@ function voiceFilter(stream) {
 
   peer.on('error', console.error);
 
+  const media = await createMedia(localCanvasWidth, localCanvasHeight);
   const recorder = createRecorder();
   const room = await createRoom(peer);
   const videoPanels = createVideoPanels(room);
 
-  // Register join handler
+  media.handleDrawFace = function(tempVideo) {
+    context.drawImage(tempVideo, 0, 0, localCanvasWidth, localCanvasHeight);
+
+    if (room.isJoined()) {
+      room.sendFace(localCanvas.toDataURL('image/jpeg', 0.3));
+    }
+  }
+
+  media.startDrawFace();
+
   joinTrigger.addEventListener('click', () => {
     if (roomId.value === "") {
       alert('Room Nameを入れてください');
       return;
     }
 
-    room.join(roomId.value, localSoundStream, 'sfu');
+    room.join(roomId.value, media.audioStream, 'sfu');
   });
 
   function sendLocalTextMessage() {
-    if(localText.value.match(/^\s*$/)) { return; }
+    if (localText.value.match(/^\s*$/)) {
+      return;
+    }
 
     room.sendMessage(localText.value);
     room.localText = localText.value;
@@ -602,9 +655,11 @@ function voiceFilter(stream) {
 
   localText.addEventListener('keydown', function () {
     if (event.key === "Enter") {
-      if(event.isComposing) { return; }
+      if (event.isComposing) {
+        return;
+      }
 
-      if(event.shiftKey) {
+      if (event.shiftKey) {
         const rows = parseInt(this.getAttribute("rows"));
         if (rows < 10) {
           this.setAttribute("rows", rows + 1);
@@ -616,6 +671,16 @@ function voiceFilter(stream) {
   });
 
   leaveTrigger.addEventListener('click', () => room.close());
+
+  saveModeCheck.addEventListener('click', function () {
+    media.enableVideo(!this.checked);
+  });
+
+  media.$afterSet.videoStatus = function(target, prop, value) {
+    if(value == media.statuses.stop) { appendMessage('== 動画キャプチャを停止しました ==') }
+    if(value == media.statuses.booting) { appendMessage('== 動画キャプチャを初期化中... ==') }
+    if(value == media.statuses.online) { appendMessage('== 動画キャプチャを開始しました ==') }
+  }
 
   room.$afterSet.localText = function (target, prop, value) {
     if (value !== '') {
@@ -680,5 +745,7 @@ function voiceFilter(stream) {
 
   const urlParams = new URLSearchParams(window.location.search);
   const roomKey = urlParams.get('room');
-  if(roomKey != undefined) { roomId.value = roomKey; }
+  if (roomKey != undefined) {
+    roomId.value = roomKey;
+  }
 })();

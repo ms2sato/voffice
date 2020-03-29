@@ -63,6 +63,12 @@ body>.container {
 .room .video-container {
   float: left;
   background-color: black;
+  color: white;
+}
+
+.room .video-container .controls{
+  text-align: right;
+  padding: 2px 4px;
 }
 
 .room .streams-container {
