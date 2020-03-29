@@ -387,23 +387,22 @@ function createMedia(width, height) {
     return;
   }
 
-  function drawFace() {
+  async function drawFace() {
     if(!instance.videoStream) { return; }
 
     let localVideo = document.createElement('video');
     localVideo.muted = true;
     localVideo.playsInline = true;
     localVideo.srcObject = instance.videoStream;
-    localVideo.play().then(function () {
+    await localVideo.play().catch(console.error);
 
-      instance.handleDrawFace(localVideo);
-      localVideo.pause();
-      localVideo.srcObject = null;
-      localVideo.remove();
-      localVideo = null;
+    instance.handleDrawFace(localVideo);
+    localVideo.pause();
+    localVideo.srcObject = null;
+    localVideo.remove();
+    localVideo = null;
 
-      setTimeout(drawFace, 3000);
-    }).catch(console.error);
+    setTimeout(drawFace, 3000);
   }
 
   const instance = enhance({

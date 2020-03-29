@@ -7,6 +7,9 @@ header {
   bottom: 1em;
   padding-left: 10px;
   padding-bottom: 8px;
+  background-color: white;
+
+  transition: 1s;
 }
 
 /* global styles */
@@ -69,6 +72,7 @@ body>.container {
 .room .video-container.local-video .controls{
   text-align: right;
   padding: 2px 4px;
+  font-size: 80%;
 }
 
 .room .video-container.local-video canvas{
@@ -127,11 +131,17 @@ body>.container {
   display: none;
 }
 
+.room .remote-panel.near img {
+  filter: blur(0px);
+}
+
 .room .remote-panel.far .far-from {
   display: none;
 }
 
-
+.room .remote-panel.far img {
+  filter: blur(3px);
+}
 
 .messages-container {
   position: absolute;
@@ -182,4 +192,16 @@ body.joining .leave-trigger {
 
 body.left .sender {
   display: none;
+}
+
+body.left header {
+  padding: 10px 40px 35px;
+  box-shadow: 1px 1px 2px;
+
+  left: 50%;
+  top: 50%;
+  bottom: auto;
+  height: auto;
+
+  transform: translate3d(-50%, -50%, 0);
 }
