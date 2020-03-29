@@ -487,11 +487,14 @@ function voiceFilter(stream) {
   const roomId = document.getElementById('js-room-id');
   const localText = document.getElementById('js-local-text');
   const sendTrigger = document.getElementById('js-send-trigger');
-  const localVideo = document.getElementById('js-local-stream');
   const localCanvas = document.getElementById('js-local-canvas');
 
   const localCanvasWidth = localCanvas.getAttribute('width');
   const localCanvasHeight = localCanvas.getAttribute('height');
+
+  const context = localCanvas.getContext("2d");
+  context.filter = "blur(2px)";
+
 
   function appendMessage(text) {
     messages.textContent += `${text}\n`;
@@ -502,20 +505,21 @@ function voiceFilter(stream) {
 
   // @see https://qiita.com/nyarisuke/items/980e4996d491f51ad241
   const constraints = {
-    audio: true,
-    sampleRate: {ideal: 48000},
-    sampleSize: {ideal: 16},
-    echoCancellation: true,
-    echoCancellationType: 'system',
-    noiseSuppression: false,
-    latency: 0.01,
+    audio: {
+      sampleRate: {ideal: 48000},
+      sampleSize: {ideal: 16},
+      echoCancellation: true,
+      echoCancellationType: 'system',
+      noiseSuppression: false,
+      latency: 1,
+    },
     video: {
-      width: localCanvas.getAttribute('width'),
+      width: { max: localCanvas.getAttribute('width') },
       height: localCanvas.getAttribute('height'),
+      frameRate: 0.05,
       facingMode: "user"
     }
   };
-
 
   const mediaDevices = navigator.mediaDevices ||
     navigator.webkitGetUserMedia ||
@@ -529,27 +533,35 @@ function voiceFilter(stream) {
 
   const localStream = await mediaDevices
     .getUserMedia(constraints)
-    .catch(console.error);
+    .catch(console.error)
+
   const localVideoStream = new MediaStream(localStream.getVideoTracks());
   const localSoundStream = voiceFilter(localStream);
 
-  // Render local stream
-  localVideo.muted = true;
-  localVideo.srcObject = localVideoStream;
-  localVideo.playsInline = true;
-  await localVideo.play().catch(console.error);
-
   function drawFace() {
-    const context = localCanvas.getContext("2d");
-    context.drawImage(localVideo, 0, 0, localCanvasWidth, localCanvasHeight);
-    const imageData = context.getImageData(0, 0, localCanvasWidth, localCanvasHeight);
-    const filtered = ImageFilters.BoxBlur(imageData, 3, 3, 4);
-    context.putImageData(filtered, 0, 0);
+    let localVideo = document.createElement('video');
+    localVideo.muted = true;
+    localVideo.playsInline = true;
+    localVideo.srcObject = localVideoStream;
+    localVideo.play().then(function() {
+      context.drawImage(localVideo, 0, 0, localCanvasWidth, localCanvasHeight);
 
-    if(room.isJoined()) {
-      room.sendFace(localCanvas.toDataURL('image/jpeg', 0.5));
-     }
+      if(room.isJoined()) {
+        room.sendFace(localCanvas.toDataURL('image/jpeg', 0.3));
+      }
+
+      localVideo.pause();
+      localVideo.srcObject = null;
+      localVideo.remove();
+      localVideo = null;
+
+      setTimeout(function () {
+        drawFace();
+      }, 3000);
+
+    }).catch(console.error);
   }
+  drawFace();
 
   const Peer = window.Peer;
 
@@ -563,11 +575,6 @@ function voiceFilter(stream) {
 
   const recorder = createRecorder();
   const room = await createRoom(peer);
-  drawFace();
-  setInterval(function () {
-    drawFace();
-  }, 3000);
-
   const videoPanels = createVideoPanels(room);
 
   // Register join handler
@@ -579,7 +586,6 @@ function voiceFilter(stream) {
 
     room.join(roomId.value, localSoundStream, 'mesh');
   });
-
 
   function sendLocalTextMessage() {
     if(localText.value.match(/^\s*$/)) { return; }
@@ -671,4 +677,8 @@ function voiceFilter(stream) {
       room.close();
     }
   }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const roomKey = urlParams.get('room');
+  if(roomKey != undefined) { roomId.value = roomKey; }
 })();

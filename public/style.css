@@ -14,6 +14,7 @@ video {
   background-color: #111;
   width: 240px;
   height: 180px;
+  /* filter: blur(5px); */
 }
 
 .heading {
@@ -30,10 +31,6 @@ body>.container {
   width: 100%;
   min-height: 100vh;
 
-}
-
-.local-video video{
-  display: none;
 }
 
 .sender {
