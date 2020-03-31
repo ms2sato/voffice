@@ -12,6 +12,12 @@ header {
   transition: 1s;
 }
 
+.terms {
+  margin-top: 2em;
+  text-align: center;
+  font-size: 80%;
+}
+
 /* global styles */
 video {
   background-color: #111;
@@ -22,6 +28,7 @@ video {
 
 .heading {
   margin-bottom: 0;
+  text-align: center;
 }
 
 .note {
