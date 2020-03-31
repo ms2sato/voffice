@@ -483,8 +483,9 @@
         const stream = peer.stream;
         const peerId = stream.peerId;
 
-        const panel = appendTo()
+        const panel = appendTo();
         panel.setAttribute('data-peer-id', peerId);
+        const nearFarSwitcher = createElementStatusSwitcher(panel, ['far', 'near']);
 
         const video = panel.getElementsByClassName('js-remote-stream')[0];
         this.video = video;
@@ -511,12 +512,10 @@
           distancePanel.innerText = distance
 
           if (distance == room.nearDistance) {
-            panel.classList.add("near");
-            panel.classList.remove("far");
+            nearFarSwitcher.near();
             appendMessage(`=== ${peerId} と近づきました ===`);
           } else if (distance == room.farDistance) {
-            panel.classList.add("far");
-            panel.classList.remove("near");
+            nearFarSwitcher.far();
             appendMessage(`=== ${peerId} と離れました ===`);
           }
         }
@@ -592,6 +591,23 @@
     }
   }
 
+  function createElementStatusSwitcher(elm, classes) {
+    const instance = {};
+    classes.forEach((cls) => {
+      instance[cls] = function() {
+        classes.forEach((clz) => {
+          if(cls === clz) {
+            elm.classList.add(clz);
+          } else {
+            elm.classList.remove(clz);
+          }
+        })
+      }
+    });
+    instance[classes[0]]();
+    return instance;
+  }
+
   const callPanelTemplate = document.getElementById('callPanelTemplate').innerText;
 
   function appendTo() {
@@ -622,6 +638,8 @@
       window.scrollTo(0, document.body.scrollHeight);
     }, 100);
   }
+
+  const roomStatusSwitcher = createElementStatusSwitcher(document.body, ['left', 'joining', 'join']);
 
   const Peer = window.Peer;
   const peer = (window.peer = new Peer({
@@ -713,15 +731,13 @@
     if (target.isJoining()) {
       appendMessage('=== 入室待ちです... ===');
 
-      document.body.classList.add("joining");
-      document.body.classList.remove("left");
+      roomStatusSwitcher.joining();
     } else if (target.isJoined()) {
       appendMessage('=== 入室しました ===');
       recorder.autoRestart = true
       recorder.start();
 
-      document.body.classList.remove("left");
-      document.body.classList.remove("joining");
+      roomStatusSwitcher.join();
     } else {
       appendMessage('== 退室しました ===');
       recorder.autoRestart = false
@@ -729,8 +745,7 @@
 
       videoPanels.removeAll();
 
-      document.body.classList.add("left");
-      document.body.classList.remove("joining");
+      roomStatusSwitcher.left();
     }
   }
 
