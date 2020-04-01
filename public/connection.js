@@ -253,6 +253,7 @@
       textReceiver: _textReceiver,
       distanceReceiver: _distanceReceiver,
       peers: _peers,
+      myFaceImageUrl: null,
       join: join,
       isJoined: function () {
         return this.status == statusJoined;
@@ -269,8 +270,8 @@
       sendMessage: function (text) {
         _protocols.text.send(text)
       },
-      sendFace: function (dataUrl) {
-        _protocols.face.send(dataUrl);
+      sendMyFace: function () {
+        if(this.myFaceImageUrl) { _protocols.face.send(this.myFaceImageUrl); }
       },
       moveTo: function (peerId, distance) {
         _peers[peerId].distance = distance;
@@ -280,6 +281,19 @@
       },
       farFrom: function (peerId) {
         _peers[peerId].farFrom();
+      },
+      setMyFace: function(faceUrl) {
+        const isBlack = faceUrl.match(/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/);
+        let ret = false;
+        if(!isBlack) {
+          this.myFaceImageUrl = faceUrl;
+          ret = true;
+        }
+
+        if (this.isJoined()) {
+          this.sendMyFace();
+        }
+        return ret;
       }
     });
 
@@ -541,6 +555,8 @@
           const img = panel.getElementsByClassName('js-remote-canvas')[0];
           img.src = face;
         }
+
+        room.sendMyFace();
       }
 
       setVolumeFromDistance(distance) {
@@ -675,8 +691,9 @@
   media.handleDrawFace = function (tempVideo) {
     context.drawImage(tempVideo, 0, 0, localCanvasWidth, localCanvasHeight);
 
-    if (room.isJoined()) {
-      room.sendFace(localCanvas.toDataURL('image/jpeg', 0.3));
+    const faceUrl = localCanvas.toDataURL('image/jpeg', 0.3);
+    if(room.setMyFace(faceUrl)) {
+      document.body.classList.remove('without-my-face');
     }
   }
 
@@ -763,6 +780,7 @@
       recorder.start();
 
       roomStatusSwitcher.join();
+      room.sendMyFace();
     } else {
       appendMessage('== 退室しました ===');
       recorder.autoRestart = false
