@@ -171,7 +171,7 @@
           if (data.type != 'face') {
             throw `Illegal type expect: face, got: ${data.type}`
           }
-          const peer = _peers[src];
+          const peer = findOrCreatePeer(src);
           if (peer) {
             peer.face = data.image;
           }
@@ -188,9 +188,10 @@
 
     const _peers = enhance.asMap({});
 
-    function createPeer(stream) {
+    function createPeer(peerId) {
       return enhance({
-        stream: stream,
+        id: peerId,
+        stream: null,
         distance: farDistance,
         face: "",
         nearTo: function () {
@@ -202,6 +203,13 @@
           _protocols.distance.sendPair(peer.id, this.stream.peerId, this.distance);
         }
       });
+    }
+
+    function findOrCreatePeer(peerId) {
+      if(!_peers[peerId]) {
+        _peers[peerId] = createPeer(peerId);
+      }
+      return _peers[peerId];
     }
 
     function join(roomId, localStream, mode = 'mesh') {
@@ -224,10 +232,11 @@
       });
       _room.on('peerJoin', peerId => {
         console.log(`peerJoin: === ${peerId} が入室しました ===`);
+        findOrCreatePeer(peerId);
       });
 
       _room.on('stream', async stream => {
-        _peers[stream.peerId] = createPeer(stream);
+        findOrCreatePeer(stream.peerId).stream = stream;
       });
 
       _room.on('data', (pack) => {
@@ -511,8 +520,7 @@
 
       constructor(peer) {
         this.peer = peer;
-        const stream = peer.stream;
-        const peerId = stream.peerId;
+        const peerId = peer.id;
 
         const panel = appendTo();
         panel.setAttribute('data-peer-id', peerId);
@@ -520,11 +528,9 @@
 
         const video = panel.getElementsByClassName('js-remote-stream')[0];
         this.video = video;
-        video.srcObject = stream;
         video.playsInline = true;
         remoteVideos.append(panel);
         this.setVolumeFromDistance(peer.distance);
-        video.play().catch(console.error);
 
         panel.getElementsByClassName('peer-id')[0].innerText = peerId;
         panel.getElementsByClassName('near-to')[0].addEventListener('click', function () {
@@ -538,6 +544,11 @@
         distancePanel.innerText = peer.distance;
 
         const _this = this;
+        peer.$afterSet.stream = function(peer, prop, stream) {
+          video.srcObject = stream;
+          video.play().catch(console.error);
+        }
+
         peer.$afterSet.distance = function (peer, prop, distance) {
           _this.setVolumeFromDistance(distance);
           distancePanel.innerText = distance
@@ -596,7 +607,7 @@
       },
       append: function (peer) {
         const videoPanel = new VideoPanel(peer);
-        videoPanels[peer.stream.peerId] = videoPanel;
+        videoPanels[peer.id] = videoPanel;
       },
       remove: function (peerId) {
         if (videoPanels[peerId] === undefined) {
