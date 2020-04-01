@@ -263,6 +263,9 @@
       close: function () {
         _room.close()
       },
+      replaceStream: function(stream) {
+        _room.replaceStream(stream);
+      },
       sendMessage: function (text) {
         _protocols.text.send(text)
       },
@@ -412,6 +415,13 @@
       setTimeout(drawFace, 3000);
     }
 
+    async function getUserMedia(audioConstraints, videoConstraints) {
+      return mediaDevices.getUserMedia({
+        audio: audioConstraints,
+        video: videoConstraints
+      }).catch(console.error)
+  }
+
     const instance = enhance({
       statuses: statuses,
       videoStatus: statuses.stop,
@@ -423,20 +433,11 @@
         }
 
         this.videoStatus = statuses.booting;
-        const [videoStream, audioStream] = await Promise.all([
-          mediaDevices.getUserMedia({
-            audio: false,
-            video: videoConstraints
-          }),
-          mediaDevices.getUserMedia({
-            audio: audioConstraints,
-            video: false
-          })
-        ]).catch(console.error)
-
+        const localStream = await getUserMedia(audioConstraints, videoConstraints);
         this.videoStatus = statuses.online;
-        this.videoStream = videoStream;
-        this.audioStream = voiceFilter(audioStream);
+
+        this.videoStream = localStream;
+        this.audioStream = voiceFilter(localStream);
 
         this.startDrawFace();
       },
@@ -446,28 +447,44 @@
       handleDrawFace: function (_tempVideo) {
         /* nop */
       },
-      enableVideo: function (value) {
-        const _this = this;
+      enableVideo: async function (value) {
         if (this.enabledVideo == value) {
           return;
         }
 
-        if (value) {
+        if(value) {
+          const localStream = await getUserMedia(audioConstraints, videoConstraints);
           this.videoStatus = statuses.booting;
-          mediaDevices.getUserMedia({
-            audio: false,
-            video: videoConstraints
-          }).then(function (videoStream) {
-            _this.videoStream = videoStream;
-            _this.videoStatus = statuses.online;
-            _this.startDrawFace();
-          }).catch(console.error);
-        } else {
-          this.videoStream.getTracks().forEach(function (track) {
+
+          const oldAudioStream = this.audioStream;
+
+          this.videoStream = localStream;
+          this.audioStream = voiceFilter(localStream);
+
+          oldAudioStream.getTracks().forEach( function (track) {
             track.stop();
           });
-          this.videoStatus = statuses.stop;
+
+          this.videoStatus = statuses.online;
+          this.startDrawFace();
+        } else {
+          const localStream = await getUserMedia(audioConstraints, false);
+
+          const oldVideoStream = this.videoStream;
+          const oldAudioStream = this.audioStream;
+
           this.videoStream = null;
+          this.audioStream = voiceFilter(localStream);
+
+          oldVideoStream.getTracks().forEach( function (track) {
+            track.stop();
+          });
+
+          oldAudioStream.getTracks().forEach( function (track) {
+            track.stop();
+          });
+
+          this.videoStatus = statuses.stop;
         }
       }
     });
@@ -640,6 +657,7 @@
   }
 
   const roomStatusSwitcher = createElementStatusSwitcher(document.body, ['left', 'joining', 'join']);
+  const mediaStatusSwitcher = createElementStatusSwitcher(document.body, ['stop', 'booting', 'online']);
 
   const Peer = window.Peer;
   const peer = (window.peer = new Peer({
@@ -712,13 +730,20 @@
   media.$afterSet.videoStatus = function (target, prop, value) {
     if (value == media.statuses.stop) {
       appendMessage('== 動画キャプチャを停止しました ==')
+      mediaStatusSwitcher.stop();
     }
     if (value == media.statuses.booting) {
       appendMessage('== 動画キャプチャを初期化中... ==')
+      mediaStatusSwitcher.booting();
     }
     if (value == media.statuses.online) {
       appendMessage('== 動画キャプチャを開始しました ==')
+      mediaStatusSwitcher.online();
     }
+  }
+
+  media.$afterSet.audioStream = function(target, prop, value) {
+    if(room.isJoined()) { room.replaceStream(target.audioStream); }
   }
 
   room.$afterSet.localText = function (target, prop, value) {

@@ -212,3 +212,8 @@ body.left header {
 
   transform: translate3d(-50%, -50%, 0);
 }
+
+body.booting label.save-mode {
+  pointer-events: none;
+  opacity: 0.5;
+}
