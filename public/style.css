@@ -26,7 +26,7 @@ video {
   /* filter: blur(5px); */
 }
 
-.heading {
+h1.heading {
   margin-bottom: 0;
   text-align: center;
 }
