@@ -390,7 +390,7 @@
 
     const audioConstraints = {
       sampleRate: {
-        ideal: 32000
+        ideal: 48000
       },
       sampleSize: {
         ideal: 16
@@ -516,13 +516,19 @@
   }
 
   function createVideoPanels(room) {
+    const callPanelTemplate = document.getElementById('callPanelTemplate').innerText;
+
+    function appendRemotePanel() {
+      return appendHtmlTo(remoteVideos, callPanelTemplate)
+    }
+
     class VideoPanel {
 
       constructor(peer) {
         this.peer = peer;
         const peerId = peer.id;
 
-        const panel = appendTo();
+        const panel = appendRemotePanel();
         panel.setAttribute('data-peer-id', peerId);
         const nearFarSwitcher = createElementStatusSwitcher(panel, ['far', 'near']);
 
@@ -652,12 +658,9 @@
     return instance;
   }
 
-  const callPanelTemplate = document.getElementById('callPanelTemplate').innerText;
-
-  function appendTo() {
-    const callPanels = remoteVideos;
-    callPanels.insertAdjacentHTML('beforeend', callPanelTemplate);
-    return callPanels.querySelector('.remote-panel:last-child');
+  function appendHtmlTo(parent, template) {
+    parent.insertAdjacentHTML('beforeend', template.trim());
+    return parent.lastChild;
   }
 
   const messages = document.getElementById('js-messages');
@@ -677,7 +680,7 @@
   context.filter = "blur(2px)";
 
   function appendMessage(text) {
-    messages.textContent += `${text}\n`;
+    appendHtmlTo(messages, `<li>${text}</li>`);
     setTimeout(function () {
       window.scrollTo(0, document.body.scrollHeight);
     }, 100);

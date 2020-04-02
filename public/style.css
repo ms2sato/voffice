@@ -10,11 +10,11 @@ header {
   background-color: white;
 
   transition: 1s;
+  text-align: initial;
 }
 
 .terms {
   margin-top: 2em;
-  text-align: center;
   font-size: 80%;
 }
 
@@ -159,6 +159,9 @@ body>.container {
 }
 
 .messages {
+  list-style: none;
+  margin: 0;
+
   position: absolute;
   bottom: 0;
   right: 0;
@@ -204,6 +207,7 @@ body.left .sender {
 body.left header {
   padding: 10px 40px 35px;
   box-shadow: 1px 1px 2px;
+  text-align: center;
 
   left: 50%;
   top: 50%;
@@ -219,6 +223,11 @@ body.booting label.save-mode {
 }
 
 body.without-my-face label.save-mode {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+body.without-my-face .join-trigger {
   pointer-events: none;
   opacity: 0.5;
 }
