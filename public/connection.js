@@ -450,6 +450,7 @@
 
     const instance = enhance({
       statuses: statuses,
+      statusList: function() { return Object.keys(this.statuses) },
       videoStatus: statuses.stop,
       audioStream: null,
       videoStream: null,
@@ -716,9 +717,6 @@
     localText.setAttribute("rows", 1);
   }
 
-  const roomStatusSwitcher = createElementStatusSwitcher(document.body, ['left', 'joining', 'join']);
-  const mediaStatusSwitcher = createElementStatusSwitcher(document.body, ['stop', 'stopping', 'booting', 'online']);
-
   const Peer = window.Peer;
   const peer = (window.peer = new Peer({
     key: window.__SKYWAY_KEY__,
@@ -731,6 +729,9 @@
   const recorder = createRecorder();
   const room = createRoom(peer);
   const videoPanels = createVideoPanels(room);
+
+  const mediaStatusSwitcher = createElementStatusSwitcher(document.body, media.statusList());
+  const roomStatusSwitcher = createElementStatusSwitcher(document.body, ['left', 'joining', 'join']);
 
   media.handleDrawFace = function (tempVideo) {
     context.drawImage(tempVideo, 0, 0, localCanvasWidth, localCanvasHeight);
