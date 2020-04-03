@@ -217,12 +217,17 @@ body.left header {
   transform: translate3d(-50%, -50%, 0);
 }
 
-body.booting label.save-mode {
+body.booting label.enable-video {
   pointer-events: none;
   opacity: 0.5;
 }
 
-body.without-my-face label.save-mode {
+body.stopping label.enable-video {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+body.without-my-face label.enable-video {
   pointer-events: none;
   opacity: 0.5;
 }

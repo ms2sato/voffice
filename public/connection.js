@@ -1,7 +1,6 @@
 (async function main() {
   function createRecorder() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
 
     if (!SpeechRecognition) {
       return enhance({
@@ -69,7 +68,7 @@
     const statusJoined = 'joined';
 
     const nearDistance = 0;
-    const farDistance = 0.8;
+    const farDistance = 0.9;
 
     const callOptions = {
       videoBandwidth: 1
@@ -170,6 +169,9 @@
         }) {
           if (data.type != 'face') {
             throw `Illegal type expect: face, got: ${data.type}`
+          }
+          if (!data.image.match(/^data:image\/jpeg;base64,[\w\/=+]+$/)) {
+            throw `Illegal image: ${data.image}`;
           }
           const peer = findOrCreatePeer(src);
           if (peer) {
@@ -384,6 +386,7 @@
   function createMedia(width, height) {
     const statuses = {
       stop: 'stop',
+      stopping: 'stoppping',
       booting: 'booting',
       online: 'online'
     };
@@ -443,13 +446,14 @@
         audio: audioConstraints,
         video: videoConstraints
       }).catch(console.error)
-  }
+    }
 
     const instance = enhance({
       statuses: statuses,
       videoStatus: statuses.stop,
       audioStream: null,
       videoStream: null,
+      enabledVideo: true,
       initialize: async function () {
         if (this.audioStream || this.videoStream) {
           throw 'already initialized';
@@ -476,8 +480,8 @@
         }
 
         if(value) {
-          const localStream = await getUserMedia(audioConstraints, videoConstraints);
           this.videoStatus = statuses.booting;
+          const localStream = await getUserMedia(audioConstraints, videoConstraints);
 
           const oldAudioStream = this.audioStream;
 
@@ -488,9 +492,10 @@
             track.stop();
           });
 
-          this.videoStatus = statuses.online;
           this.startDrawFace();
+          this.videoStatus = statuses.online;
         } else {
+          this.videoStatus = statuses.stopping;
           const localStream = await getUserMedia(audioConstraints, false);
 
           const oldVideoStream = this.videoStream;
@@ -509,6 +514,8 @@
 
           this.videoStatus = statuses.stop;
         }
+
+        this.enabledVideo = value;
       }
     });
 
@@ -539,12 +546,23 @@
         this.setVolumeFromDistance(peer.distance);
 
         panel.getElementsByClassName('peer-id')[0].innerText = peerId;
+
         panel.getElementsByClassName('near-to')[0].addEventListener('click', function () {
           room.nearTo(peerId);
         });
+
         panel.getElementsByClassName('far-from')[0].addEventListener('click', function () {
           room.farFrom(peerId);
         });
+
+        panel.getElementsByClassName('js-remote-canvas')[0].addEventListener('click', function(){
+          if(peer.distance == room.nearDistance) {
+            room.farFrom(peerId);
+          } else {
+            room.nearTo(peerId);
+          }
+        });
+
 
         const distancePanel = panel.getElementsByClassName('distance')[0];
         distancePanel.innerText = peer.distance;
@@ -670,7 +688,7 @@
   const roomId = document.getElementById('js-room-id');
   const localText = document.getElementById('js-local-text');
   const sendTrigger = document.getElementById('js-send-trigger');
-  const saveModeCheck = document.getElementById('js-save-mode');
+  const enableVideoCheck = document.getElementById('js-enable-video');
   const localCanvas = document.getElementById('js-local-canvas');
 
   const localCanvasWidth = localCanvas.getAttribute('width');
@@ -680,14 +698,26 @@
   context.filter = "blur(2px)";
 
   function appendMessage(text) {
-    appendHtmlTo(messages, `<li>${text}</li>`);
+    const line = appendHtmlTo(messages, '<li></li>');
+    line.innerText = text;
     setTimeout(function () {
       window.scrollTo(0, document.body.scrollHeight);
     }, 100);
   }
 
+  function sendLocalTextMessage() {
+    if (localText.value.match(/^\s*$/)) {
+      return;
+    }
+
+    room.sendMessage(localText.value);
+    room.localText = localText.value;
+    localText.value = '';
+    localText.setAttribute("rows", 1);
+  }
+
   const roomStatusSwitcher = createElementStatusSwitcher(document.body, ['left', 'joining', 'join']);
-  const mediaStatusSwitcher = createElementStatusSwitcher(document.body, ['stop', 'booting', 'online']);
+  const mediaStatusSwitcher = createElementStatusSwitcher(document.body, ['stop', 'stopping', 'booting', 'online']);
 
   const Peer = window.Peer;
   const peer = (window.peer = new Peer({
@@ -720,17 +750,6 @@
     room.join(roomId.value, media.audioStream, 'sfu');
   });
 
-  function sendLocalTextMessage() {
-    if (localText.value.match(/^\s*$/)) {
-      return;
-    }
-
-    room.sendMessage(localText.value);
-    room.localText = localText.value;
-    localText.value = '';
-    localText.setAttribute("rows", 1);
-  }
-
   sendTrigger.addEventListener('click', () => {
     sendLocalTextMessage();
   });
@@ -754,14 +773,18 @@
 
   leaveTrigger.addEventListener('click', () => room.close());
 
-  saveModeCheck.addEventListener('click', function () {
-    media.enableVideo(!this.checked);
+  enableVideoCheck.addEventListener('click', function () {
+    media.enableVideo(this.checked);
   });
 
   media.$afterSet.videoStatus = function (target, prop, value) {
     if (value == media.statuses.stop) {
       appendMessage('== 動画キャプチャを停止しました ==')
       mediaStatusSwitcher.stop();
+    }
+    if (value == media.statuses.stopping) {
+      appendMessage('== 動画キャプチャを停止中... ==')
+      mediaStatusSwitcher.stopping();
     }
     if (value == media.statuses.booting) {
       appendMessage('== 動画キャプチャを初期化中... ==')
@@ -837,6 +860,7 @@
   }
 
   media.initialize();
+  enableVideoCheck.checked = media.enabledVideo;
 
   const urlParams = new URLSearchParams(window.location.search);
   const roomKey = urlParams.get('room');
