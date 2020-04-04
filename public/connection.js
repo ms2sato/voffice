@@ -1,10 +1,4 @@
 (async function main() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const roomKey = urlParams.get('room');
-  if (roomKey != undefined) {
-    roomId.value = roomKey;
-  }
-
   function createRecorder() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -411,7 +405,7 @@
     const videoConstraints = {
       width: width,
       height: height,
-      frameRate: 0.05,
+      frameRate: 0.1,
       facingMode: "user"
     };
 
@@ -442,7 +436,7 @@
       localVideo.remove();
       localVideo = null;
 
-      setTimeout(drawFace, 3000);
+      setTimeout(drawFace, 5000);
     }
 
     async function getUserMedia(audioConstraints, videoConstraints) {
@@ -700,6 +694,12 @@
 
   const context = localCanvas.getContext("2d");
   context.filter = "blur(2px)";
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const roomKey = urlParams.get('room');
+  if (roomKey != undefined) {
+    roomId.value = roomKey;
+  }
 
   function appendMessage(text) {
     const line = appendHtmlTo(messages, '<li></li>');

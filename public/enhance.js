@@ -15,12 +15,11 @@
 
   enhance.avoidInsert = function avoidInsert(obj) {
     return new Proxy({}, {
-      set: function (target, prop, value) {
-        if (!obj.hasOwnProperty(prop)) {
-          throw Error(`new propety cannot set: ${prop}`)
+      defineProperty(target, key, descriptor) {
+        if (!obj.hasOwnProperty(key)) {
+          throw Error(`new propety cannot set: ${key}`)
         }
-
-        Reflect.set(...arguments);
+        Reflect.defineProperty(...arguments);
         return true;
       }
     });
@@ -35,6 +34,13 @@
     })
 
     return new Proxy(obj, {
+      defineProperty(target, key, descriptor) {
+        if (!obj.hasOwnProperty(key)) {
+          throw Error(`new propety cannot set: ${key}`)
+        }
+        Reflect.defineProperty(...arguments);
+        return true;
+      },
       get: function(target, prop, receiver) {
         if (!target.hasOwnProperty(prop)) {
           throw Error(`undefined property access: ${prop}`)
