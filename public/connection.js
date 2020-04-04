@@ -1,4 +1,10 @@
 (async function main() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const roomKey = urlParams.get('room');
+  if (roomKey != undefined) {
+    roomId.value = roomKey;
+  }
+
   function createRecorder() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -859,10 +865,4 @@
 
   media.initialize();
   enableVideoCheck.checked = media.enabledVideo;
-
-  const urlParams = new URLSearchParams(window.location.search);
-  const roomKey = urlParams.get('room');
-  if (roomKey != undefined) {
-    roomId.value = roomKey;
-  }
 })();
