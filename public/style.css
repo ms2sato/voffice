@@ -231,8 +231,3 @@ body.without-my-face label.enable-video {
   pointer-events: none;
   opacity: 0.5;
 }
-
-body.without-my-face .join-trigger {
-  pointer-events: none;
-  opacity: 0.5;
-}
