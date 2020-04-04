@@ -9,7 +9,7 @@
     } else if (obj instanceof Map) {
       return enhance.asMap(obj);
     } else {
-      return enhance.asObject(obj);
+      return enhance.asModel(obj);
     }
   }
 
@@ -25,7 +25,7 @@
     });
   }
 
-  enhance.asObject = function asObject(obj) {
+  enhance.asModel = function asModel(obj) {
     const afterSetKey = '$afterSet';
     const enhanceKeys = [afterSetKey];
 
@@ -63,6 +63,9 @@
           listener(target, prop, value);
         }
         return true;
+      },
+      ownKeys (target) {
+        return Reflect.ownKeys(target).filter((key) => { return !enhanceKeys.includes(key) });
       },
       has(target, key) {
         if (enhanceKeys.includes(key)) {
@@ -113,6 +116,9 @@
           listener(target, prop, willDelete);
         }
         return true;
+      },
+      ownKeys (target) {
+        return Reflect.ownKeys(target).filter((key) => { return !enhanceKeys.includes(key) });
       },
       has(target, key) {
         if (enhanceKeys.includes(key)) {
