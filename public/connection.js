@@ -148,7 +148,7 @@
 
           const peerId2Distance = _distanceReceiver.normalizedDistances();
           for (var peerId in peerId2Distance) {
-            const peer = _peers[peerId];
+            const peer = instance.peers[peerId];
             if (peer == undefined) {
               continue;
             }
@@ -188,8 +188,6 @@
       }
     }
 
-    const _peers = enhance.asMap({});
-
     function createPeer(peerId) {
       return enhance({
         id: peerId,
@@ -208,10 +206,10 @@
     }
 
     function findOrCreatePeer(peerId) {
-      if(!_peers[peerId]) {
-        _peers[peerId] = createPeer(peerId);
+      if(!instance.peers[peerId]) {
+        instance.peers[peerId] = createPeer(peerId);
       }
-      return _peers[peerId];
+      return instance.peers[peerId];
     }
 
     function join(roomId, localStream, mode = 'mesh') {
@@ -246,11 +244,11 @@
       });
 
       _room.on('peerLeave', peerId => {
-        delete _peers[peerId];
+        delete instance.peers[peerId];
       });
 
-      // for closing myself
       _room.once('close', () => {
+        instance.peers.$clear();
         instance.status = statusLeft;
       });
     }
@@ -263,7 +261,7 @@
       localText: '',
       textReceiver: _textReceiver,
       distanceReceiver: _distanceReceiver,
-      peers: _peers,
+      peers: enhance.asMap({}),
       myFaceImageUrl: null,
       join: join,
       isJoined: function () {
@@ -285,13 +283,13 @@
         if(this.myFaceImageUrl) { _protocols.face.send(this.myFaceImageUrl); }
       },
       moveTo: function (peerId, distance) {
-        _peers[peerId].distance = distance;
+        instance.peers[peerId].distance = distance;
       },
       nearTo: function (peerId) {
-        _peers[peerId].nearTo();
+        instance.peers[peerId].nearTo();
       },
       farFrom: function (peerId) {
-        _peers[peerId].farFrom();
+        instance.peers[peerId].farFrom();
       },
       setMyFace: function(faceUrl) {
         const isBlack = faceUrl.match(/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/);
@@ -563,7 +561,6 @@
             room.nearTo(peerId);
           }
         });
-
 
         const distancePanel = panel.getElementsByClassName('distance')[0];
         distancePanel.innerText = peer.distance;

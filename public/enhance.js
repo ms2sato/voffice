@@ -20,7 +20,7 @@
           throw Error(`new propety cannot set: ${prop}`)
         }
 
-        Reflect.set(target, prop, value);
+        Reflect.set(...arguments);
         return true;
       }
     });
@@ -35,9 +35,15 @@
     })
 
     return new Proxy(obj, {
+      get: function(target, prop, receiver) {
+        if (!target.hasOwnProperty(prop)) {
+          throw Error(`undefined property access: ${prop}`)
+        }
+        return Reflect.get(...arguments);
+      },
       set: function (target, prop, value) {
         if (enhanceKeys.includes(prop)) {
-          Reflect.set(target, prop, value);
+          Reflect.set(...arguments);
           return true;
         }
 
@@ -45,7 +51,7 @@
           throw Error(`new propety cannot set: ${prop}`)
         }
 
-        Reflect.set(target, prop, value);
+        Reflect.set(...arguments);
         const listener = obj[afterSetKey][prop];
         if (listener) {
           listener(target, prop, value);
@@ -64,20 +70,29 @@
   enhance.asMap = function asMap(obj) {
     const afterSetKey = '$afterSet';
     const afterDeleteKey = '$afterDelete';
-    const enhanceKeys = [afterSetKey, afterDeleteKey];
+    const clearKey = '$clear';
+    const enhanceKeys = [afterSetKey, afterDeleteKey, clearKey];
 
     enhanceKeys.forEach(enhanceKey => {
-      obj[enhanceKey] = {};
-    })
+      if(enhanceKey === clearKey) {
+        obj[clearKey] = function() {
+          for (const key of Object.getOwnPropertyNames(obj)) {
+            if(!enhanceKeys.includes(key)) { delete obj[key]; }
+          }
+        }
+      } else {
+        obj[enhanceKey] = null;
+      }
+    });
 
     return new Proxy(obj, {
       set: function (target, prop, value) {
         if (enhanceKeys.includes(prop)) {
-          Reflect.set(target, prop, value);
+          Reflect.set(...arguments);
           return true;
         }
 
-        Reflect.set(target, prop, value);
+        Reflect.set(...arguments);
         const listener = obj[afterSetKey];
         if (listener) {
           listener(target, prop, value);
@@ -86,7 +101,7 @@
       },
       deleteProperty: function (target, prop, value) {
         const willDelete = target[prop];
-        Reflect.deleteProperty(target, prop, value);
+        Reflect.deleteProperty(...arguments);
         const listener = obj[afterDeleteKey];
         if (listener) {
           listener(target, prop, willDelete);
@@ -100,7 +115,6 @@
         return key in target;
       }
     });
-
   }
 
   enhance.asArray = function asArray(array) {
@@ -115,7 +129,7 @@
 
     return new Proxy(array, {
       deleteProperty: function (target, prop, value) {
-        Reflect.deleteProperty(target, prop, value);
+        Reflect.deleteProperty(...arguments);
         if (!isNaN(prop)) {
           const listener = array[afterDeleteKey];
           if (listener) {
@@ -126,12 +140,12 @@
       },
       set: function (target, prop, value) {
         if (enhanceKeys.includes(key)) {
-          Reflect.set(target, prop, value);
+          Reflect.set(...arguments);
           return true;
         }
 
         const isInsert = target[prop] === undefined;
-        Reflect.set(target, prop, value);
+        Reflect.set(...arguments);
         if (!isNaN(prop)) {
           const key = isInsert ? afterInsertKey : afterUpdateKey;
           const listener = array[key];
