@@ -213,8 +213,6 @@
     }
 
     function join(roomId, localStream, mode = 'mesh') {
-      // Note that you need to ensure the peer has connected to signaling server
-      // before using methods of peer instance.
       if (!peer.open) {
         return;
       }
@@ -312,72 +310,46 @@
   function voiceFilter(stream) {
     // return new MediaStream(stream.getAudioTracks());
 
+    const type2num = {
+      'lowpass' : 0,
+      'highpass' : 1,
+      'lowshelf' : 3,
+      'highshelf' : 4,
+      'peaking' : 5
+    };
 
-    let context = new(window.AudioContext || window.webkitAudioContext)();
-    let mic = context.createMediaStreamSource(stream);
-    let output = context.createMediaStreamDestination();
+    function createFilter(params) {
+      const filter = context.createBiquadFilter();
+      filter.type = (typeof filter.type === 'string') ? params.type : type2num[params.type];
+      filter.frequency.value = params.frequency;
 
-    // Create the instance of BiquadFilterNode
-    let sbass = context.createBiquadFilter();
-    let bass = context.createBiquadFilter();
-    let middle1 = context.createBiquadFilter();
-    let middle2 = context.createBiquadFilter();
-    let treble1 = context.createBiquadFilter();
-    let treble2 = context.createBiquadFilter();
-    let treble3 = context.createBiquadFilter();
-    let lowpass = context.createBiquadFilter();
-    let highpass = context.createBiquadFilter();
+      if(params.gain != undefined) { filter.gain.value = params.gain; }
+      return filter;
+    }
 
-    // Set type
-    sbass.type = (typeof bass.type === 'string') ? 'lowshelf' : 3;
-    bass.type = (typeof bass.type === 'string') ? 'lowshelf' : 3;
-    middle1.type = (typeof middle1.type === 'string') ? 'peaking' : 5;
-    middle2.type = (typeof middle2.type === 'string') ? 'peaking' : 5;
-    treble1.type = (typeof treble1.type === 'string') ? 'highshelf' : 4;
-    treble2.type = (typeof treble2.type === 'string') ? 'highshelf' : 4;
-    treble3.type = (typeof treble3.type === 'string') ? 'highshelf' : 4;
-    lowpass.type = (typeof lowpass.type === 'string') ? 'lowpass' : 0;
-    highpass.type = (typeof highpass.type === 'string') ? 'highpass' : 1;
+    const context = new(window.AudioContext || window.webkitAudioContext)();
 
-    // Set frequency
-    lowpass.frequency.value = 8000;
-    highpass.frequency.value = 100;
-    sbass.frequency.value = 0.1;
-    bass.frequency.value = 200;
-    middle1.frequency.value = 600;
-    middle2.frequency.value = 1000;
-    treble1.frequency.value = 1800;
-    treble2.frequency.value = 4000;
-    treble3.frequency.value = 6000;
+    const paramsList = [
+      {type: 'lowpass', frequency:  8000 },
+      {type: 'highpass', frequency:  100 },
+      {type: 'lowshelf', frequency:  110, gain: -2 },
+      {type: 'lowshelf', frequency:  200, gain: -1 },
+      {type: 'peaking', frequency:  500, gain: 4 },
+      {type: 'peaking', frequency:  1000, gain: 5 },
+      {type: 'highshelf', frequency:  1800, gain: 1 },
+      {type: 'highshelf', frequency:  4000, gain: -3 },
+      {type: 'highshelf', frequency:  6000, gain: -4 },
+    ];
 
-    // Set Q (Quality Factor)
-    // bass.Q.value   = Math.SQRT1_2;  // Not used
-    middle1.Q.value = Math.SQRT1_2;
-    middle2.Q.value = Math.SQRT1_2;
-    // treble.Q.value = Math.SQRT1_2;  // Not used
-    lowpass.Q.value = 0.2;
-    highpass.Q.value = 0.7;
+    let target = context.createMediaStreamSource(stream);
+    paramsList.forEach(function(params){
+      const nextFilter = createFilter(params);
+      target.connect(nextFilter);
+      target = nextFilter;
+    });
 
-    // Initialize Gain
-    sbass.gain.value = -1;
-    bass.gain.value = 1;
-    middle1.gain.value = 3;
-    middle2.gain.value = 2;
-    treble1.gain.value = 1;
-    treble2.gain.value = 0;
-    treble3.gain.value = -2;
-
-    mic.connect(lowpass);
-    lowpass.connect(highpass);
-    highpass.connect(sbass);
-    sbass.connect(bass);
-    bass.connect(middle1);
-    middle1.connect(middle2);
-    middle2.connect(treble1);
-    treble1.connect(treble2);
-    treble2.connect(treble3);
-    treble3.connect(output);
-
+    const output = context.createMediaStreamDestination();
+    target.connect(output);
     return output.stream;
   }
 
