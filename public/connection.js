@@ -206,7 +206,7 @@
     }
 
     function findOrCreatePeer(peerId) {
-      if(!instance.peers[peerId]) {
+      if (!instance.peers[peerId]) {
         instance.peers[peerId] = createPeer(peerId);
       }
       return instance.peers[peerId];
@@ -271,14 +271,16 @@
       close: function () {
         _room.close()
       },
-      replaceStream: function(stream) {
+      replaceStream: function (stream) {
         _room.replaceStream(stream);
       },
       sendMessage: function (text) {
         _protocols.text.send(text)
       },
       sendMyFace: function () {
-        if(this.myFaceImageUrl) { _protocols.face.send(this.myFaceImageUrl); }
+        if (this.myFaceImageUrl) {
+          _protocols.face.send(this.myFaceImageUrl);
+        }
       },
       moveTo: function (peerId, distance) {
         instance.peers[peerId].distance = distance;
@@ -289,10 +291,10 @@
       farFrom: function (peerId) {
         instance.peers[peerId].farFrom();
       },
-      setMyFace: function(faceUrl) {
+      setMyFace: function (faceUrl) {
         const isBlack = faceUrl.match(/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/);
         let ret = false;
-        if(!isBlack) {
+        if (!isBlack) {
           this.myFaceImageUrl = faceUrl;
           ret = true;
         }
@@ -311,11 +313,11 @@
     // return new MediaStream(stream.getAudioTracks());
 
     const type2num = {
-      'lowpass' : 0,
-      'highpass' : 1,
-      'lowshelf' : 3,
-      'highshelf' : 4,
-      'peaking' : 5
+      'lowpass': 0,
+      'highpass': 1,
+      'lowshelf': 3,
+      'highshelf': 4,
+      'peaking': 5
     };
 
     function createFilter(params) {
@@ -323,26 +325,61 @@
       filter.type = (typeof filter.type === 'string') ? params.type : type2num[params.type];
       filter.frequency.value = params.frequency;
 
-      if(params.gain != undefined) { filter.gain.value = params.gain; }
+      if (params.gain != undefined) {
+        filter.gain.value = params.gain;
+      }
       return filter;
     }
 
     const context = new(window.AudioContext || window.webkitAudioContext)();
 
-    const paramsList = [
-      {type: 'lowpass', frequency:  8000 },
-      {type: 'highpass', frequency:  100 },
-      {type: 'lowshelf', frequency:  110, gain: -2 },
-      {type: 'lowshelf', frequency:  200, gain: -1 },
-      {type: 'peaking', frequency:  500, gain: 4 },
-      {type: 'peaking', frequency:  1000, gain: 5 },
-      {type: 'highshelf', frequency:  1800, gain: 1 },
-      {type: 'highshelf', frequency:  4000, gain: -3 },
-      {type: 'highshelf', frequency:  6000, gain: -4 },
+    const paramsList = [{
+        type: 'lowpass',
+        frequency: 8000
+      },
+      {
+        type: 'highpass',
+        frequency: 100
+      },
+      {
+        type: 'lowshelf',
+        frequency: 110,
+        gain: -2
+      },
+      {
+        type: 'lowshelf',
+        frequency: 200,
+        gain: -1
+      },
+      {
+        type: 'peaking',
+        frequency: 500,
+        gain: 4
+      },
+      {
+        type: 'peaking',
+        frequency: 1000,
+        gain: 5
+      },
+      {
+        type: 'highshelf',
+        frequency: 1800,
+        gain: 1
+      },
+      {
+        type: 'highshelf',
+        frequency: 4000,
+        gain: -3
+      },
+      {
+        type: 'highshelf',
+        frequency: 6000,
+        gain: -4
+      },
     ];
 
     let target = context.createMediaStreamSource(stream);
-    paramsList.forEach(function(params){
+    paramsList.forEach(function (params) {
       const nextFilter = createFilter(params);
       target.connect(nextFilter);
       target = nextFilter;
@@ -420,7 +457,9 @@
 
     const instance = enhance({
       statuses: statuses,
-      statusList: function() { return Object.keys(this.statuses) },
+      statusList: function () {
+        return Object.keys(this.statuses)
+      },
       videoStatus: statuses.stop,
       audioStream: null,
       videoStream: null,
@@ -450,7 +489,7 @@
           return;
         }
 
-        if(value) {
+        if (value) {
           this.videoStatus = statuses.booting;
           const localStream = await getUserMedia(audioConstraints, videoConstraints);
 
@@ -459,7 +498,7 @@
           this.videoStream = localStream;
           this.audioStream = voiceFilter(localStream);
 
-          oldAudioStream.getTracks().forEach( function (track) {
+          oldAudioStream.getTracks().forEach(function (track) {
             track.stop();
           });
 
@@ -475,11 +514,11 @@
           this.videoStream = null;
           this.audioStream = voiceFilter(localStream);
 
-          oldVideoStream.getTracks().forEach( function (track) {
+          oldVideoStream.getTracks().forEach(function (track) {
             track.stop();
           });
 
-          oldAudioStream.getTracks().forEach( function (track) {
+          oldAudioStream.getTracks().forEach(function (track) {
             track.stop();
           });
 
@@ -526,8 +565,8 @@
           room.farFrom(peerId);
         });
 
-        panel.getElementsByClassName('js-remote-canvas')[0].addEventListener('click', function(){
-          if(peer.distance == room.nearDistance) {
+        panel.getElementsByClassName('js-remote-canvas')[0].addEventListener('click', function () {
+          if (peer.distance == room.nearDistance) {
             room.farFrom(peerId);
           } else {
             room.nearTo(peerId);
@@ -538,7 +577,7 @@
         distancePanel.innerText = peer.distance;
 
         const _this = this;
-        peer.$afterSet.stream = function(peer, prop, stream) {
+        peer.$afterSet.stream = function (peer, prop, stream) {
           video.srcObject = stream;
           video.play().catch(console.error);
         }
@@ -632,9 +671,9 @@
   function createElementStatusSwitcher(elm, classes) {
     const instance = {};
     classes.forEach((cls) => {
-      instance[cls] = function() {
+      instance[cls] = function () {
         classes.forEach((clz) => {
-          if(cls === clz) {
+          if (cls === clz) {
             elm.classList.add(clz);
           } else {
             elm.classList.remove(clz);
@@ -712,7 +751,7 @@
     context.drawImage(tempVideo, 0, 0, localCanvasWidth, localCanvasHeight);
 
     const faceUrl = localCanvas.toDataURL('image/jpeg', 0.3);
-    if(room.setMyFace(faceUrl)) {
+    if (room.setMyFace(faceUrl)) {
       document.body.classList.remove('without-my-face');
     }
   }
@@ -772,8 +811,10 @@
     }
   }
 
-  media.$afterSet.audioStream = function(target, prop, value) {
-    if(room.isJoined()) { room.replaceStream(target.audioStream); }
+  media.$afterSet.audioStream = function (target, prop, value) {
+    if (room.isJoined()) {
+      room.replaceStream(target.audioStream);
+    }
   }
 
   room.$afterSet.localText = function (target, prop, value) {
