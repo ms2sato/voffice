@@ -48,13 +48,6 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTH
     })
 
     return new Proxy(obj, {
-      defineProperty(target, key, descriptor) {
-        if (!obj.hasOwnProperty(key)) {
-          throw Error(`new propety cannot set: ${key}`)
-        }
-        Reflect.defineProperty(...arguments);
-        return true;
-      },
       get: function(target, prop, receiver) {
         if (!target.hasOwnProperty(prop)) {
           throw Error(`undefined property access: ${prop}`)
