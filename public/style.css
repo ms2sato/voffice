@@ -45,24 +45,20 @@ body>.container {
 
 .sender {
   position: fixed;
+  display: flex;
   left: 240px;
-  right: 0;
+  right: 10px;
   bottom: 20px;
   margin: 0 auto;
 }
 
 .sender .local-text-wrapper {
   margin-right: 55px;
+  flex: 1;
 }
 
 .sender textarea {
-  width: 100%;
-}
-
-.sender button {
-  position: absolute;
-  right: 10px;
-  top: 0;
+  flex: 1
 }
 
 /* room */
@@ -151,23 +147,19 @@ body>.container {
 }
 
 .messages-container {
-  position: absolute;
-  top: 0;
-  bottom: 50px;
-  right: 0;
-  left: 240px;
+  display: flex;
+  margin-left: 240px;
+  min-height: 100vh;
+  padding-right: 10px;
 }
 
 .messages {
   list-style: none;
-  margin: 0;
-
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  left: 0;
+  width: 100%;
+  margin-top: auto;
   background-color: #eee;
   padding: 8px;
+  margin-bottom: 53px;
 }
 
 body.left .leave-trigger {
