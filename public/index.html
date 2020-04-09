@@ -73,6 +73,7 @@
             <div class="video-container local-video">
               <canvas id="js-local-canvas" width="180" height="135"></canvas>
               <div class="controls">
+                <a href="javascript:void(0)" id="js-enable-capture">画面共有</a>
                 <label class="enable-video">
                   <input type="checkbox" id="js-enable-video">video
                 </label>
@@ -107,18 +108,31 @@
     <script src="./enhance.js"></script>
 
     <script>
+      function listenEvent(elm, eventName) {
+        return new Promise(resolve => {
+          const listener = function() {
+            resolve();
+            elm.removeEventListener(eventName, listener, false);
+          };
+          elm.addEventListener(eventName, listener, false)
+        });
+      }
+
       function addScript( src ) {
         const s = document.createElement('script');
         s.setAttribute('src', src);
         document.head.appendChild(s);
+        return listenEvent(s, 'load');
       }
 
-      if(window.location.hostname == 'localhost') {
-        addScript("./key.dev.js");
-      } else {
-        addScript("./key.js");
-      }
-      addScript("./connection.js");
+      (async function(){
+        if(window.location.hostname == 'localhost') {
+          await addScript("./key.dev.js");
+        } else {
+          await addScript("./key.js");
+        }
+        await addScript("./connection.js");
+      })();
     </script>
   </body>
 </html>
