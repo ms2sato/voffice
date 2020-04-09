@@ -47,19 +47,6 @@
     <meta name="msapplication-TileColor" content="#ffffff" />
     <meta name="msapplication-TileImage" content="/ms-icon-144x144.png" />
     <meta name="theme-color" content="#ffffff" />
-    <script>
-      function addScript( src ) {
-        const s = document.createElement('script');
-        s.setAttribute('src', src);
-        document.head.appendChild(s);
-      }
-
-      if(window.location.hostname == 'localhost') {
-        addScript("./key.dev.js");
-      } else {
-        addScript("./key.js");
-      }
-    </script>
   </head>
   <body class="left without-my-face">
     <div class="container">
@@ -118,6 +105,20 @@
     <script src="//cdn.webrtc.ecl.ntt.com/skyway-latest.js"></script>
     <script src="//davidenke.github.io/context-filter-polyfill/dist/index.js"></script>
     <script src="./enhance.js"></script>
-    <script src="./connection.js"></script>
+
+    <script>
+      function addScript( src ) {
+        const s = document.createElement('script');
+        s.setAttribute('src', src);
+        document.head.appendChild(s);
+      }
+
+      if(window.location.hostname == 'localhost') {
+        addScript("./key.dev.js");
+      } else {
+        addScript("./key.js");
+      }
+      addScript("./connection.js");
+    </script>
   </body>
 </html>
