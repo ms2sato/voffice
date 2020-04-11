@@ -2,7 +2,7 @@
   function createRecorder() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (!SpeechRecognition) {
+    if (true || !SpeechRecognition) {
       return enhance({
         text: '',
         autoRestart: true,
@@ -71,7 +71,7 @@
     const farDistance = 0.9;
 
     const callOptions = {
-      videoBandwidth: 1
+      videoBandwidth: 200
     };
 
     const _textReceiver = enhance({
@@ -455,6 +455,13 @@
       }).catch(console.error)
     }
 
+    async function getDisplayMedia(audioConstraints, videoConstraints) {
+      return mediaDevices.getDisplayMedia({
+        audio: audioConstraints,
+        video: videoConstraints
+      }).catch(console.error)
+    }
+
     function stopStream(stream) {
       stream.getTracks().forEach(function (track) {
         track.stop();
@@ -475,6 +482,7 @@
       videoStatus: statuses.stop,
       audioStream: null,
       videoStream: null,
+      captureStream: null,
       enabledVideo: true,
       enabledAudio: true,
       initialize: async function () {
@@ -496,6 +504,18 @@
       },
       handleDrawFace: function (_tempVideo) {
         /* nop */
+      },
+      enableCapture: async function() {
+        this.videoStatus = statuses.booting;
+        const localStream = await getDisplayMedia(true, true);
+        // this.audioStream.getAudioTracks().forEach(track =>{ localStream.addTrack(track) })
+
+        const oldAudioStream = this.audioStream;
+
+        this.captureStream = localStream;
+        this.audioStream = null;
+
+        this.videoStatus = statuses.online;
       },
       enableAudio: function(value) {
         if (this.enabledAudio == value) {
@@ -562,9 +582,9 @@
         panel.setAttribute('data-peer-id', peerId);
         const nearFarSwitcher = createElementStatusSwitcher(panel, ['far', 'near']);
 
-        const video = panel.getElementsByClassName('js-remote-stream')[0];
-        this.video = video;
-        video.playsInline = true;
+        const audio = panel.getElementsByClassName('js-remote-stream')[0];
+        this.audio = audio;
+        audio.playsInline = true;
         remoteVideos.append(panel);
         this.setVolumeFromDistance(peer.distance);
 
@@ -591,8 +611,8 @@
 
         const _this = this;
         peer.$afterSet.stream = function (peer, prop, stream) {
-          video.srcObject = stream;
-          video.play().catch(console.error);
+          audio.srcObject = stream;
+          audio.play().catch(console.error);
         }
 
         peer.$afterSet.distance = function (peer, prop, distance) {
@@ -626,7 +646,7 @@
         if (value < 0 || 1 < value) {
           throw `Volume out of range(0 to 1.0): ${value}`
         }
-        this.video.volume = value;
+        this.audio.volume = value;
       }
 
       remove() {
@@ -638,7 +658,7 @@
         if(remoteVideo.srcObject) {
           remoteVideo.srcObject.getTracks().forEach(track => track.stop());
           remoteVideo.srcObject = null;
-          }
+        }
         remoteVideoPanel.remove();
       }
     }
@@ -714,7 +734,9 @@
   const sendTrigger = document.getElementById('js-send-trigger');
   const enableVideoCheck = document.getElementById('js-enable-video');
   const enableAudioCheck = document.getElementById('js-enable-audio');
+  const captureTrigger = document.getElementById('js-enable-capture');
   const localCanvas = document.getElementById('js-local-canvas');
+  const localStream = document.getElementById('js-local-stream');
 
   const localCanvasWidth = localCanvas.getAttribute('width');
   const localCanvasHeight = localCanvas.getAttribute('height');
@@ -754,6 +776,7 @@
   }));
 
   peer.on('error', console.error);
+  peer.on('call', console.log);
 
   const media = createMedia(localCanvasWidth, localCanvasHeight);
   const recorder = createRecorder();
@@ -812,6 +835,10 @@
     media.enableAudio(this.checked);
   });
 
+  captureTrigger.addEventListener('click', function(){
+    media.enableCapture();
+  });
+
   media.$afterSet.videoStatus = function (target, prop, value) {
     if (value == media.statuses.stop) {
       appendMessage('== 動画キャプチャを停止しました ==')
@@ -834,6 +861,16 @@
   media.$afterSet.audioStream = function (target, prop, value) {
     if (room.isJoined() && target.audioStream) {
       room.replaceStream(target.audioStream);
+    }
+  }
+
+  media.$afterSet.captureStream = function (target, prop, value) {
+    if (target.captureStream) {
+      localStream.srcObject = target.captureStream;
+      localStream.play().catch(console.error);
+      if (room.isJoined()) {
+        room.replaceStream(target.captureStream);
+      }
     }
   }
 
