@@ -455,6 +455,18 @@
       }).catch(console.error)
     }
 
+    function stopStream(stream) {
+      stream.getTracks().forEach(function (track) {
+        track.stop();
+      });
+    }
+
+    function enableStream(stream, value) {
+      stream.getTracks().forEach(function (track) {
+        track.enabled = value
+      });
+    }
+
     const instance = enhance({
       statuses: statuses,
       statusList: function () {
@@ -464,6 +476,7 @@
       audioStream: null,
       videoStream: null,
       enabledVideo: true,
+      enabledAudio: true,
       initialize: async function () {
         if (this.audioStream || this.videoStream) {
           throw 'already initialized';
@@ -484,6 +497,13 @@
       handleDrawFace: function (_tempVideo) {
         /* nop */
       },
+      enableAudio: function(value) {
+        if (this.enabledAudio == value) {
+          return;
+        }
+        enableStream(this.audioStream, value);
+        this.enabledAudio = value;
+      },
       enableVideo: async function (value) {
         if (this.enabledVideo == value) {
           return;
@@ -498,9 +518,7 @@
           this.videoStream = localStream;
           this.audioStream = voiceFilter(localStream);
 
-          oldAudioStream.getTracks().forEach(function (track) {
-            track.stop();
-          });
+          stopStream(oldAudioStream);
 
           this.startDrawFace();
           this.videoStatus = statuses.online;
@@ -514,13 +532,8 @@
           this.videoStream = null;
           this.audioStream = voiceFilter(localStream);
 
-          oldVideoStream.getTracks().forEach(function (track) {
-            track.stop();
-          });
-
-          oldAudioStream.getTracks().forEach(function (track) {
-            track.stop();
-          });
+          stopStream(oldVideoStream);
+          stopStream(oldAudioStream);
 
           this.videoStatus = statuses.stop;
         }
@@ -618,12 +631,14 @@
 
       remove() {
         const remoteVideoPanel = document.querySelector(
-          `[data-peer-id="${this.peer.stream.peerId}"]`
+          `[data-peer-id="${this.peer.id}"]`
         );
 
         const remoteVideo = remoteVideoPanel.getElementsByClassName('js-remote-stream')[0];
-        remoteVideo.srcObject.getTracks().forEach(track => track.stop());
-        remoteVideo.srcObject = null;
+        if(remoteVideo.srcObject) {
+          remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+          remoteVideo.srcObject = null;
+          }
         remoteVideoPanel.remove();
       }
     }
@@ -698,6 +713,7 @@
   const localText = document.getElementById('js-local-text');
   const sendTrigger = document.getElementById('js-send-trigger');
   const enableVideoCheck = document.getElementById('js-enable-video');
+  const enableAudioCheck = document.getElementById('js-enable-audio');
   const localCanvas = document.getElementById('js-local-canvas');
 
   const localCanvasWidth = localCanvas.getAttribute('width');
@@ -762,7 +778,7 @@
       return;
     }
 
-    room.join(roomId.value, media.audioStream, 'sfu');
+    room.join(roomId.value, media.audioStream, 'mesh');
   });
 
   sendTrigger.addEventListener('click', () => {
@@ -792,6 +808,10 @@
     media.enableVideo(this.checked);
   });
 
+  enableAudioCheck.addEventListener('click', function () {
+    media.enableAudio(this.checked);
+  });
+
   media.$afterSet.videoStatus = function (target, prop, value) {
     if (value == media.statuses.stop) {
       appendMessage('== 動画キャプチャを停止しました ==')
@@ -812,7 +832,7 @@
   }
 
   media.$afterSet.audioStream = function (target, prop, value) {
-    if (room.isJoined()) {
+    if (room.isJoined() && target.audioStream) {
       room.replaceStream(target.audioStream);
     }
   }
@@ -878,4 +898,5 @@
 
   media.initialize();
   enableVideoCheck.checked = media.enabledVideo;
+  enableAudioCheck.checked = media.enabledAudio;
 })();

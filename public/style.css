@@ -214,6 +214,11 @@ body.booting label.enable-video {
   opacity: 0.5;
 }
 
+body.booting label.enable-audio {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
 body.stopping label.enable-video {
   pointer-events: none;
   opacity: 0.5;
