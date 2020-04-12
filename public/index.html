@@ -76,6 +76,9 @@
                 <label class="enable-video">
                   <input type="checkbox" id="js-enable-video">video
                 </label>
+                <label class="enable-audio">
+                  <input type="checkbox" id="js-enable-audio">mic
+                </label>
               </div>
             </div>
           </div>
@@ -113,7 +116,7 @@
             resolve();
             elm.removeEventListener(eventName, listener, false);
           };
-          elm.addEventListener(eventName, listener, false)
+          elm.addEventListener(eventName, listener, false);
         });
       }
 
