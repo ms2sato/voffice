@@ -582,9 +582,9 @@
         panel.setAttribute('data-peer-id', peerId);
         const nearFarSwitcher = createElementStatusSwitcher(panel, ['far', 'near']);
 
-        const audio = panel.getElementsByClassName('js-remote-stream')[0];
-        this.audio = audio;
-        audio.playsInline = true;
+        const video = panel.getElementsByClassName('js-remote-stream')[0];
+        this.video = video;
+        video.playsInline = true;
         remoteVideos.append(panel);
         this.setVolumeFromDistance(peer.distance);
 
@@ -611,8 +611,8 @@
 
         const _this = this;
         peer.$afterSet.stream = function (peer, prop, stream) {
-          audio.srcObject = stream;
-          audio.play().catch(console.error);
+          video.srcObject = stream;
+          video.play().catch(console.error);
         }
 
         peer.$afterSet.distance = function (peer, prop, distance) {
@@ -646,7 +646,7 @@
         if (value < 0 || 1 < value) {
           throw `Volume out of range(0 to 1.0): ${value}`
         }
-        this.audio.volume = value;
+        this.video.volume = value;
       }
 
       remove() {
