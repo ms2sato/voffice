@@ -22,15 +22,28 @@
       autoRestart: true,
       enabled: true,
       start: function () {
+        if(!this.enabled) { throw Error('Cannot call when disabled'); }
         console.log('recorder start');
         speech.start();
       },
       stop: function () {
+        if(!this.enabled) { throw Error('Cannot call when disabled'); }
         console.log('recorder stop');
         speech.stop();
       },
       canAutoRestart: function () {
         return this.autoRestart && this.enabled
+      },
+      enable: function(value) {
+        if(this.enabled === value) { return }
+
+        if(value) {
+          this.enabled = true;
+          this.start();
+        } else {
+          this.stop();
+          this.enabled = false;
+        }
       }
     });
 
@@ -831,6 +844,10 @@
     }
   }
 
+  media.$afterSet.enabledAudio = function(target, prop, value) {
+    recorder.enable(value);
+  }
+
   media.$afterSet.audioStream = function (target, prop, value) {
     if (room.isJoined() && target.audioStream) {
       room.replaceStream(target.audioStream);
@@ -850,15 +867,21 @@
       roomStatusSwitcher.joining();
     } else if (target.isJoined()) {
       appendMessage('=== 入室しました ===');
-      recorder.autoRestart = true
-      recorder.start();
+
+      if(recorder.enabled) {
+        recorder.autoRestart = true;
+        recorder.start();
+       }
 
       roomStatusSwitcher.join();
       room.sendMyFace();
     } else {
       appendMessage('== 退室しました ===');
-      recorder.autoRestart = false
-      recorder.stop();
+
+      if(recorder.enabled) {
+        recorder.autoRestart = false
+        recorder.stop();
+      }
 
       videoPanels.removeAll();
 
