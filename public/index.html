@@ -72,7 +72,9 @@
           <div class="remote-streams" id="js-remote-streams">
             <div class="video-container local-video">
               <canvas id="js-local-canvas" width="180" height="135"></canvas>
+              <video id="js-local-stream"></video>
               <div class="controls">
+                <a id="js-enable-capture" href="javascript:void(0)">画面共有</a>
                 <label class="enable-video">
                   <input type="checkbox" id="js-enable-video">video
                 </label>
@@ -94,7 +96,7 @@
 
     <script type="text/template" id="callPanelTemplate">
       <div class="remote-panel video-container far">
-        <audio class="js-remote-stream"></audio>
+        <video class="js-remote-stream" width="1024" height="864"></video>
         <img class="js-remote-canvas"/>
         <div class="heading">
           <a class="near-to" href="javascript:void(0)">寄る</a>
