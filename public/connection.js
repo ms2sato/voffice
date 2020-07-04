@@ -791,7 +791,7 @@
       return;
     }
 
-    room.join(roomId.value, media.audioStream, 'mesh');
+    room.join(roomId.value, media.audioStream, 'sfu');
   });
 
   sendTrigger.addEventListener('click', () => {
